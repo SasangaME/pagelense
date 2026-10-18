@@ -1,0 +1,9 @@
+.git
+.github
+infra
+docs
+bin
+*.md
+*.out
+coverage.html
+.env*
