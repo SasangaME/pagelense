@@ -20,7 +20,7 @@ cover:
 	go tool cover -html=$(COVER) -o coverage.html
 
 lint:
-	golangci-lint run ./...
+	go tool golangci-lint run ./...
 
 clean:
 	rm -rf $(BIN_DIR) $(COVER) coverage.html
