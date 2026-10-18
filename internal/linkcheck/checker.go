@@ -23,24 +23,27 @@ func (r Result) Accessible() bool {
 
 // Options controls how links are checked.
 type Options struct {
-	Workers int           // number of concurrent checks; values below 1 mean 1
-	Timeout time.Duration // per link, covering the HEAD and any GET fallback; 0 means no limit
+	Workers  int           // number of concurrent checks; values below 1 mean 1
+	Timeout  time.Duration // per link, covering the HEAD and any GET fallback; 0 means no limit
+	MaxLinks int           // most unique URLs checked per call; values below 1 mean no limit
 }
 
 // Checker checks links with a fixed number of workers. It is safe for concurrent use.
 type Checker struct {
-	client  *http.Client
-	workers int
-	timeout time.Duration
+	client   *http.Client
+	workers  int
+	timeout  time.Duration
+	maxLinks int
 }
 
 // New returns a Checker that sends requests with client.
 func New(client *http.Client, opts Options) *Checker {
-	return &Checker{client: client, workers: max(opts.Workers, 1), timeout: opts.Timeout}
+	return &Checker{client: client, workers: max(opts.Workers, 1), timeout: opts.Timeout, maxLinks: opts.MaxLinks}
 }
 
-// Check checks urls concurrently and returns results in completion order, skipping unsent URLs if ctx is canceled.
+// Check checks the first MaxLinks unique urls concurrently; results are in completion order and omit URLs skipped after ctx is canceled.
 func (c *Checker) Check(ctx context.Context, urls []string) []Result {
+	urls = unique(urls, c.maxLinks)
 	jobs := make(chan string)
 	results := make(chan Result)
 
@@ -109,4 +112,20 @@ func (c *Checker) request(ctx context.Context, method, rawURL string) (int, erro
 	}
 	_ = resp.Body.Close()
 	return resp.StatusCode, nil
+}
+
+// unique returns urls without duplicates, keeping first occurrences in order, cut to limit if limit > 0.
+func unique(urls []string, limit int) []string {
+	seen := make(map[string]bool, len(urls))
+	out := make([]string, 0, len(urls))
+	for _, u := range urls {
+		if limit > 0 && len(out) == limit {
+			break
+		}
+		if !seen[u] {
+			seen[u] = true
+			out = append(out, u)
+		}
+	}
+	return out
 }

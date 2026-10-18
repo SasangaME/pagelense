@@ -3,6 +3,8 @@ package linkcheck
 import (
 	"context"
 	"errors"
+	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -12,6 +14,15 @@ import (
 	"testing"
 	"time"
 )
+
+// distinctURLs returns n different URLs on base, so deduplication does not merge them.
+func distinctURLs(base string, n int) []string {
+	urls := make([]string, n)
+	for i := range urls {
+		urls[i] = fmt.Sprintf("%s/%d", base, i)
+	}
+	return urls
+}
 
 func TestCheckAllURLs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -127,10 +138,7 @@ func TestCheckWorkerCount(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	urls := make([]string, 10)
-	for i := range urls {
-		urls[i] = srv.URL
-	}
+	urls := distinctURLs(srv.URL, 10)
 	results := New(srv.Client(), Options{Workers: workers}).Check(context.Background(), urls)
 
 	if len(results) != len(urls) {
@@ -151,10 +159,7 @@ func TestCheckCanceled(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	urls := make([]string, 50)
-	for i := range urls {
-		urls[i] = srv.URL
-	}
+	urls := distinctURLs(srv.URL, 50)
 
 	done := make(chan []Result)
 	go func() { done <- New(srv.Client(), Options{Workers: 1}).Check(ctx, urls) }()
@@ -202,10 +207,7 @@ func TestCheckTimeoutIsPerLink(t *testing.T) {
 	defer srv.Close()
 
 	// one worker checks the links one after another: 15 × 20ms = 300ms in total, beyond the timeout
-	urls := make([]string, 15)
-	for i := range urls {
-		urls[i] = srv.URL
-	}
+	urls := distinctURLs(srv.URL, 15)
 	results := New(srv.Client(), Options{Workers: 1, Timeout: 200 * time.Millisecond}).
 		Check(context.Background(), urls)
 
@@ -232,7 +234,7 @@ func TestCheckCanceledInFlight(t *testing.T) {
 	}()
 
 	start := time.Now()
-	results := New(srv.Client(), Options{Workers: 1}).Check(ctx, []string{srv.URL, srv.URL})
+	results := New(srv.Client(), Options{Workers: 1}).Check(ctx, distinctURLs(srv.URL, 2))
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Errorf("Check took %v after cancel, want it to return promptly", elapsed)
 	}
@@ -241,5 +243,51 @@ func TestCheckCanceledInFlight(t *testing.T) {
 	}
 	if !errors.Is(results[0].Err, context.Canceled) {
 		t.Errorf("got %+v, want context.Canceled", results[0])
+	}
+}
+
+func TestUnique(t *testing.T) {
+	tests := []struct {
+		name  string
+		urls  []string
+		limit int
+		want  []string
+	}{
+		{"empty", nil, 0, []string{}},
+		{"no duplicates", []string{"a", "b"}, 0, []string{"a", "b"}},
+		{"duplicates keep first order", []string{"b", "a", "b", "c", "a"}, 0, []string{"b", "a", "c"}},
+		{"limit", []string{"a", "b", "c"}, 2, []string{"a", "b"}},
+		{"limit counts unique URLs", []string{"a", "a", "a", "b", "c"}, 2, []string{"a", "b"}},
+		{"limit above count", []string{"a", "b"}, 5, []string{"a", "b"}},
+		{"negative limit means none", []string{"a", "b"}, -1, []string{"a", "b"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := unique(tt.urls, tt.limit); !slices.Equal(got, tt.want) {
+				t.Errorf("unique(%v, %d) = %v, want %v", tt.urls, tt.limit, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckDedupAndCap(t *testing.T) {
+	var mu sync.Mutex
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits[r.URL.Path]++
+		mu.Unlock()
+	}))
+	defer srv.Close()
+
+	urls := []string{srv.URL + "/a", srv.URL + "/a", srv.URL + "/b", srv.URL + "/a", srv.URL + "/c", srv.URL + "/d"}
+	results := New(srv.Client(), Options{Workers: 2, MaxLinks: 3}).Check(context.Background(), urls)
+
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3", len(results))
+	}
+	want := map[string]int{"/a": 1, "/b": 1, "/c": 1}
+	if !maps.Equal(hits, want) {
+		t.Errorf("requests per path = %v, want %v", hits, want)
 	}
 }
