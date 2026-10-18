@@ -24,6 +24,8 @@ type Options struct {
 	MaxRedirects int           // 0 means redirects are not followed
 	MaxBodyBytes int64
 	UserAgent    string
+	// AllowPrivateIPs disables the SSRF check; only for tests against local servers.
+	AllowPrivateIPs bool
 }
 
 // Page is a downloaded web page.
@@ -46,7 +48,8 @@ func New(opts Options) *Fetcher {
 	maxRedirects := opts.MaxRedirects
 	return &Fetcher{
 		client: &http.Client{
-			Timeout: opts.Timeout,
+			Timeout:   opts.Timeout,
+			Transport: newTransport(opts.AllowPrivateIPs),
 			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
 				// len(via) == number of redirects including this one
 				if len(via) > maxRedirects {

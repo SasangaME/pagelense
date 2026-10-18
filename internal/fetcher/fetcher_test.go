@@ -21,6 +21,8 @@ func testOptions() Options {
 		MaxRedirects: 3,
 		MaxBodyBytes: 1024,
 		UserAgent:    "pagelense-test/1.0",
+		// httptest servers listen on loopback
+		AllowPrivateIPs: true,
 	}
 }
 

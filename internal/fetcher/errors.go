@@ -45,6 +45,8 @@ func transportError(host string, err error) error {
 		dnsErr *net.DNSError
 	)
 	switch {
+	case errors.Is(err, ErrBlockedAddress):
+		return &FetchError{http.StatusForbidden, fmt.Sprintf("%s resolves to a private or reserved address", host), err}
 	case errors.Is(err, context.DeadlineExceeded),
 		errors.As(err, &netErr) && netErr.Timeout():
 		return &FetchError{http.StatusGatewayTimeout, fmt.Sprintf("timed out fetching %s", host), err}
