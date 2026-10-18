@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base href="https://cdn.example.com/">
+  <base href="https://ignored.example.com/">
+  <title>
+    Example   Store
+  </title>
+</head>
+<body>
+  <header>
+    <h1>Example Store</h1>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/products">Products</a>
+      <a href="https://blog.example.org/">Blog</a>
+      <a name="top">Not a link</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Featured</h2>
+    <h3>Shoes</h3>
+    <h3>Bags</h3>
+    <h2>Offers</h2>
+
+    <svg width="10" height="10">
+      <title>Decorative icon</title>
+      <a href="/svg-link"><circle r="5"/></a>
+    </svg>
+
+    <img src="map.png" usemap="#map" alt="Map">
+    <map name="map">
+      <area shape="rect" coords="0,0,10,10" href="/area-link" alt="Area">
+    </map>
+
+    <form action="/search">
+      <input type="search" name="q">
+    </form>
+
+    <form action="/login" method="post">
+      <h4>Sign in</h4>
+      <input type="text" name="user">
+      <input type="password" name="pass">
+    </form>
+  </main>
+
+  <footer>
+    <h5>Contact</h5>
+    <h6>Legal</h6>
+    <a href="mailto:hello@example.com">Email</a>
+    <a href="#top">Back to top</a>
+  </footer>
+</body>
+</html>
