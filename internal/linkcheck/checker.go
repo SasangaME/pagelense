@@ -71,16 +71,25 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	return out
 }
 
-// check sends a HEAD request to rawURL.
+// check sends a HEAD request to rawURL, retrying with GET if the server does not allow HEAD.
 func (c *Checker) check(ctx context.Context, rawURL string) Result {
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, rawURL, nil)
+	status, err := c.request(ctx, http.MethodHead, rawURL)
+	if err == nil && status == http.StatusMethodNotAllowed {
+		status, err = c.request(ctx, http.MethodGet, rawURL)
+	}
+	return Result{URL: rawURL, StatusCode: status, Err: err}
+}
+
+// request sends a method request to rawURL and returns the status code without reading the body.
+func (c *Checker) request(ctx context.Context, method, rawURL string) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
 	if err != nil {
-		return Result{URL: rawURL, Err: fmt.Errorf("build request: %w", err)}
+		return 0, fmt.Errorf("build request: %w", err)
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return Result{URL: rawURL, Err: err}
+		return 0, err
 	}
 	_ = resp.Body.Close()
-	return Result{URL: rawURL, StatusCode: resp.StatusCode}
+	return resp.StatusCode, nil
 }

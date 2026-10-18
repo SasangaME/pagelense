@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -31,6 +32,50 @@ func TestCheckAllURLs(t *testing.T) {
 		if r.Accessible() != wantOK {
 			t.Errorf("%s: Accessible() = %v, want %v (status %d, err %v)", r.URL, r.Accessible(), wantOK, r.StatusCode, r.Err)
 		}
+	}
+}
+
+func TestCheckMethodFallback(t *testing.T) {
+	tests := []struct {
+		name        string
+		getStatus   int
+		wantMethods []string
+		wantStatus  int
+	}{
+		{"HEAD allowed", 0, []string{http.MethodHead}, http.StatusOK},
+		{"GET after 405", http.StatusOK, []string{http.MethodHead, http.MethodGet}, http.StatusOK},
+		{"GET after 405 fails", http.StatusNotFound, []string{http.MethodHead, http.MethodGet}, http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var methods []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				methods = append(methods, r.Method)
+				mu.Unlock()
+				if tt.getStatus == 0 {
+					return // 200 for every method
+				}
+				if r.Method == http.MethodHead {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				w.WriteHeader(tt.getStatus)
+			}))
+			defer srv.Close()
+
+			results := New(srv.Client(), 1).Check(context.Background(), []string{srv.URL})
+			if len(results) != 1 {
+				t.Fatalf("got %d results, want 1", len(results))
+			}
+			if results[0].StatusCode != tt.wantStatus {
+				t.Errorf("status = %d, want %d", results[0].StatusCode, tt.wantStatus)
+			}
+			if !slices.Equal(methods, tt.wantMethods) {
+				t.Errorf("methods = %v, want %v", methods, tt.wantMethods)
+			}
+		})
 	}
 }
 
