@@ -3,10 +3,14 @@ package fetcher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -50,18 +54,42 @@ func TestFetchOK(t *testing.T) {
 	}
 }
 
-func TestFetchNon2xxReturnsPage(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.NotFound(w, nil)
-	}))
-	defer srv.Close()
-
-	page, err := New(testOptions()).Fetch(context.Background(), srv.URL)
-	if err != nil {
-		t.Fatalf("Fetch: %v", err)
+func TestFetchNon2xx(t *testing.T) {
+	tests := []struct {
+		code    int
+		wantMsg string
+	}{
+		{code: http.StatusNotFound, wantMsg: "upstream returned 404 Not Found"},
+		{code: http.StatusInternalServerError, wantMsg: "upstream returned 500 Internal Server Error"},
+		{code: http.StatusServiceUnavailable, wantMsg: "upstream returned 503 Service Unavailable"},
+		{code: 599, wantMsg: "upstream returned 599"},
 	}
-	if page.StatusCode != http.StatusNotFound {
-		t.Errorf("StatusCode = %d, want 404", page.StatusCode)
+
+	for _, tt := range tests {
+		t.Run(tt.wantMsg, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.code)
+			}))
+			defer srv.Close()
+
+			_, err := New(testOptions()).Fetch(context.Background(), srv.URL)
+			fe := requireFetchError(t, err, tt.code)
+			if fe.Message != tt.wantMsg {
+				t.Errorf("Message = %q, want %q", fe.Message, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestFetchConnectionRefused(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	addr := srv.URL
+	srv.Close() // nothing listens on addr any more
+
+	_, err := New(testOptions()).Fetch(context.Background(), addr)
+	fe := requireFetchError(t, err, http.StatusBadGateway)
+	if !strings.HasPrefix(fe.Message, "connection refused by ") {
+		t.Errorf("Message = %q", fe.Message)
 	}
 }
 
@@ -111,6 +139,7 @@ func TestFetchRedirects(t *testing.T) {
 		if !errors.Is(err, ErrTooManyRedirects) {
 			t.Fatalf("error = %v, want ErrTooManyRedirects", err)
 		}
+		_ = requireFetchError(t, err, http.StatusBadGateway)
 	})
 
 	t.Run("loop", func(t *testing.T) {
@@ -145,6 +174,7 @@ func TestFetchBodyLimit(t *testing.T) {
 				if !errors.Is(err, ErrBodyTooLarge) {
 					t.Fatalf("error = %v, want ErrBodyTooLarge", err)
 				}
+				_ = requireFetchError(t, err, http.StatusBadGateway)
 				return
 			}
 			if err != nil {
@@ -171,6 +201,7 @@ func TestFetchTimeout(t *testing.T) {
 	if !errors.As(err, &netErr) || !netErr.Timeout() {
 		t.Fatalf("error = %v, want a timeout", err)
 	}
+	_ = requireFetchError(t, err, http.StatusGatewayTimeout)
 }
 
 func TestFetchContextCanceled(t *testing.T) {
@@ -186,6 +217,84 @@ func TestFetchContextCanceled(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context.Canceled", err)
 	}
+	var fe *FetchError
+	if errors.As(err, &fe) {
+		t.Errorf("caller cancellation should not be a FetchError, got %v", fe)
+	}
+}
+
+func TestTransportError(t *testing.T) {
+	refused := &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantMsg  string
+	}{
+		{
+			name:     "DNS failure",
+			err:      &url.Error{Op: "Get", URL: "http://nope.invalid", Err: &net.OpError{Op: "dial", Err: &net.DNSError{Err: "no such host", Name: "nope.invalid", IsNotFound: true}}},
+			wantCode: http.StatusBadGateway,
+			wantMsg:  "could not resolve host example.com",
+		},
+		{
+			name:     "DNS timeout",
+			err:      &net.DNSError{Err: "i/o timeout", Name: "slow.example", IsTimeout: true},
+			wantCode: http.StatusGatewayTimeout,
+			wantMsg:  "timed out fetching example.com",
+		},
+		{
+			name:     "connection refused",
+			err:      &url.Error{Op: "Get", URL: "http://example.com", Err: refused},
+			wantCode: http.StatusBadGateway,
+			wantMsg:  "connection refused by example.com",
+		},
+		{
+			name:     "deadline exceeded",
+			err:      fmt.Errorf("read body: %w", context.DeadlineExceeded),
+			wantCode: http.StatusGatewayTimeout,
+			wantMsg:  "timed out fetching example.com",
+		},
+		{
+			name:     "other",
+			err:      errors.New("tls: handshake failure"),
+			wantCode: http.StatusBadGateway,
+			wantMsg:  "could not fetch example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := transportError("example.com", tt.err)
+			fe := requireFetchError(t, err, tt.wantCode)
+			if fe.Message != tt.wantMsg {
+				t.Errorf("Message = %q, want %q", fe.Message, tt.wantMsg)
+			}
+			if !errors.Is(err, tt.err) {
+				t.Errorf("FetchError does not unwrap to the cause")
+			}
+		})
+	}
+
+	t.Run("caller cancellation passes through", func(t *testing.T) {
+		cause := fmt.Errorf("get: %w", context.Canceled)
+		//nolint:errorlint // checking identity: the cause must be returned unwrapped
+		if err := transportError("example.com", cause); err != cause {
+			t.Errorf("error = %v, want the cause unchanged", err)
+		}
+	})
+}
+
+func requireFetchError(t *testing.T, err error, wantCode int) *FetchError {
+	t.Helper()
+	var fe *FetchError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error = %v (%T), want *FetchError", err, err)
+	}
+	if fe.StatusCode != wantCode {
+		t.Errorf("StatusCode = %d, want %d", fe.StatusCode, wantCode)
+	}
+	return fe
 }
 
 func TestFetchInvalidURL(t *testing.T) {

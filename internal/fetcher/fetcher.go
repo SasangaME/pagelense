@@ -60,7 +60,7 @@ func New(opts Options) *Fetcher {
 	}
 }
 
-// Fetch downloads rawURL and returns the page, whatever its status code.
+// Fetch downloads rawURL. HTTP and network failures are returned as *FetchError.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -71,17 +71,21 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, transportError(req.URL.Host, err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, statusError(resp.StatusCode)
+	}
 
 	// +1 to detect bodies over the limit
 	body, err := io.ReadAll(io.LimitReader(resp.Body, f.maxBodyBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, transportError(req.URL.Host, fmt.Errorf("read body: %w", err))
 	}
 	if int64(len(body)) > f.maxBodyBytes {
-		return nil, fmt.Errorf("%w (limit %d bytes)", ErrBodyTooLarge, f.maxBodyBytes)
+		return nil, transportError(req.URL.Host, fmt.Errorf("%w (limit %d bytes)", ErrBodyTooLarge, f.maxBodyBytes))
 	}
 
 	return &Page{
