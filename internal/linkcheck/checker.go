@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // Result is the outcome of checking a single link.
@@ -20,15 +21,22 @@ func (r Result) Accessible() bool {
 	return r.Err == nil && r.StatusCode < 400
 }
 
+// Options controls how links are checked.
+type Options struct {
+	Workers int           // number of concurrent checks; values below 1 mean 1
+	Timeout time.Duration // per link, covering the HEAD and any GET fallback; 0 means no limit
+}
+
 // Checker checks links with a fixed number of workers. It is safe for concurrent use.
 type Checker struct {
 	client  *http.Client
 	workers int
+	timeout time.Duration
 }
 
-// New returns a Checker that sends requests with client using up to workers goroutines.
-func New(client *http.Client, workers int) *Checker {
-	return &Checker{client: client, workers: max(workers, 1)}
+// New returns a Checker that sends requests with client.
+func New(client *http.Client, opts Options) *Checker {
+	return &Checker{client: client, workers: max(opts.Workers, 1), timeout: opts.Timeout}
 }
 
 // Check checks urls concurrently and returns results in completion order, skipping unsent URLs if ctx is canceled.
@@ -50,6 +58,10 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	go func() {
 		defer close(jobs)
 		for _, u := range urls {
+			// select picks at random when both cases are ready, so check ctx first
+			if ctx.Err() != nil {
+				return
+			}
 			select {
 			case jobs <- u:
 			case <-ctx.Done():
@@ -73,6 +85,11 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 
 // check sends a HEAD request to rawURL, retrying with GET if the server does not allow HEAD.
 func (c *Checker) check(ctx context.Context, rawURL string) Result {
+	if c.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
 	status, err := c.request(ctx, http.MethodHead, rawURL)
 	if err == nil && status == http.StatusMethodNotAllowed {
 		status, err = c.request(ctx, http.MethodGet, rawURL)

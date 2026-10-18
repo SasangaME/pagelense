@@ -2,6 +2,7 @@ package linkcheck
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -21,7 +22,7 @@ func TestCheckAllURLs(t *testing.T) {
 	defer srv.Close()
 
 	urls := []string{srv.URL + "/a", srv.URL + "/b", srv.URL + "/missing", srv.URL + "/c"}
-	results := New(srv.Client(), 2).Check(context.Background(), urls)
+	results := New(srv.Client(), Options{Workers: 2}).Check(context.Background(), urls)
 
 	if len(results) != len(urls) {
 		t.Fatalf("got %d results, want %d", len(results), len(urls))
@@ -65,7 +66,7 @@ func TestCheckMethodFallback(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			results := New(srv.Client(), 1).Check(context.Background(), []string{srv.URL})
+			results := New(srv.Client(), Options{Workers: 1}).Check(context.Background(), []string{srv.URL})
 			if len(results) != 1 {
 				t.Fatalf("got %d results, want 1", len(results))
 			}
@@ -80,7 +81,7 @@ func TestCheckMethodFallback(t *testing.T) {
 }
 
 func TestCheckNoURLs(t *testing.T) {
-	results := New(http.DefaultClient, 4).Check(context.Background(), nil)
+	results := New(http.DefaultClient, Options{Workers: 4}).Check(context.Background(), nil)
 	if len(results) != 0 {
 		t.Fatalf("got %d results, want 0", len(results))
 	}
@@ -91,7 +92,7 @@ func TestCheckNetworkError(t *testing.T) {
 	url := srv.URL
 	srv.Close() // nothing listens on the port any more
 
-	results := New(http.DefaultClient, 1).Check(context.Background(), []string{url})
+	results := New(http.DefaultClient, Options{Workers: 1}).Check(context.Background(), []string{url})
 	if len(results) != 1 {
 		t.Fatalf("got %d results, want 1", len(results))
 	}
@@ -130,7 +131,7 @@ func TestCheckWorkerCount(t *testing.T) {
 	for i := range urls {
 		urls[i] = srv.URL
 	}
-	results := New(srv.Client(), workers).Check(context.Background(), urls)
+	results := New(srv.Client(), Options{Workers: workers}).Check(context.Background(), urls)
 
 	if len(results) != len(urls) {
 		t.Fatalf("got %d results, want %d", len(results), len(urls))
@@ -156,7 +157,7 @@ func TestCheckCanceled(t *testing.T) {
 	}
 
 	done := make(chan []Result)
-	go func() { done <- New(srv.Client(), 1).Check(ctx, urls) }()
+	go func() { done <- New(srv.Client(), Options{Workers: 1}).Check(ctx, urls) }()
 
 	select {
 	case results := <-done:
@@ -165,5 +166,80 @@ func TestCheckCanceled(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Check did not return after cancel")
+	}
+}
+
+// blockUntilDone holds each request open until the client gives up or the test times out.
+func blockUntilDone(_ http.ResponseWriter, r *http.Request) {
+	select {
+	case <-r.Context().Done():
+	case <-time.After(2 * time.Second):
+	}
+}
+
+func TestCheckTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(blockUntilDone))
+	defer srv.Close()
+
+	start := time.Now()
+	results := New(srv.Client(), Options{Workers: 1, Timeout: 50 * time.Millisecond}).
+		Check(context.Background(), []string{srv.URL})
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("Check took %v, want about 50ms", elapsed)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	if !errors.Is(results[0].Err, context.DeadlineExceeded) || results[0].Accessible() {
+		t.Errorf("got %+v, want a deadline error", results[0])
+	}
+}
+
+func TestCheckTimeoutIsPerLink(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		time.Sleep(20 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	// one worker checks the links one after another: 15 × 20ms = 300ms in total, beyond the timeout
+	urls := make([]string, 15)
+	for i := range urls {
+		urls[i] = srv.URL
+	}
+	results := New(srv.Client(), Options{Workers: 1, Timeout: 200 * time.Millisecond}).
+		Check(context.Background(), urls)
+
+	for _, r := range results {
+		if !r.Accessible() {
+			t.Errorf("got %+v, want accessible", r)
+		}
+	}
+}
+
+func TestCheckCanceledInFlight(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	arrived := make(chan struct{})
+	var once sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { close(arrived) })
+		blockUntilDone(w, r)
+	}))
+	defer srv.Close()
+
+	go func() {
+		<-arrived
+		cancel()
+	}()
+
+	start := time.Now()
+	results := New(srv.Client(), Options{Workers: 1}).Check(ctx, []string{srv.URL, srv.URL})
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("Check took %v after cancel, want it to return promptly", elapsed)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1 (second URL should be skipped)", len(results))
+	}
+	if !errors.Is(results[0].Err, context.Canceled) {
+		t.Errorf("got %+v, want context.Canceled", results[0])
 	}
 }
