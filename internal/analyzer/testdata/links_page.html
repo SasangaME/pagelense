@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Link Cases</title>
+</head>
+<body>
+  <h1>Link cases</h1>
+  <ul>
+    <!-- internal -->
+    <li><a href="/">Root</a></li>
+    <li><a href="related.html">Relative</a></li>
+    <li><a href="../about/">Parent directory</a></li>
+    <li><a href="https://example.com/contact">Absolute, same host</a></li>
+    <li><a href="http://EXAMPLE.com/legacy">Other scheme and case, same host</a></li>
+    <li><a href="/docs#install">Path with fragment</a></li>
+    <li><a href="/">Root again (duplicate)</a></li>
+
+    <!-- external -->
+    <li><a href="https://www.example.com/">www subdomain</a></li>
+    <li><a href="https://github.com/golang/go">GitHub</a></li>
+    <li><a href="//cdn.example.net/app.js">Protocol-relative</a></li>
+
+    <!-- skipped -->
+    <li><a href="#comments">Fragment only</a></li>
+    <li><a href="">Empty</a></li>
+    <li><a href="mailto:author@example.com">Mail</a></li>
+    <li><a href="tel:+15550100">Phone</a></li>
+    <li><a href="javascript:void(0)">Script</a></li>
+    <li><a href="ftp://files.example.com/archive.zip">FTP</a></li>
+    <li><a>No href</a></li>
+  </ul>
+  <svg width="10" height="10"><a href="/svg-only"><circle r="5"/></a></svg>
+</body>
+</html>

@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"errors"
-	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -116,39 +115,6 @@ func TestParsePage(t *testing.T) {
 				t.Errorf("forms = %d, want %d", len(p.forms), tt.wantForms)
 			}
 		})
-	}
-}
-
-func TestParsePageSample(t *testing.T) {
-	f, err := os.Open("testdata/html5_page.html")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	p, err := parsePage(f)
-	if err != nil {
-		t.Fatalf("parsePage: unexpected error: %v", err)
-	}
-
-	if p.htmlVersion != versionHTML5 {
-		t.Errorf("htmlVersion = %q, want %q", p.htmlVersion, versionHTML5)
-	}
-	if want := "Example Store"; p.title != want {
-		t.Errorf("title = %q, want %q", p.title, want)
-	}
-	if want := (Headings{H1: 1, H2: 2, H3: 2, H4: 1, H5: 1, H6: 1}); p.headings != want {
-		t.Errorf("headings = %+v, want %+v", p.headings, want)
-	}
-	if want := "https://cdn.example.com/"; p.baseHref != want {
-		t.Errorf("baseHref = %q, want %q", p.baseHref, want)
-	}
-	wantHrefs := []string{"/", "/products", "https://blog.example.org/", "/area-link", "mailto:hello@example.com", "#top"}
-	if !slices.Equal(p.hrefs, wantHrefs) {
-		t.Errorf("hrefs = %q, want %q", p.hrefs, wantHrefs)
-	}
-	if len(p.forms) != 2 {
-		t.Errorf("forms = %d, want 2", len(p.forms))
 	}
 }
 

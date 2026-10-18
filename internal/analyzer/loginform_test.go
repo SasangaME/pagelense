@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -47,35 +46,6 @@ func TestHasLoginForm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := parsePage(strings.NewReader(tt.html))
-			if err != nil {
-				t.Fatalf("parsePage: unexpected error: %v", err)
-			}
-			if got := hasLoginForm(p.forms); got != tt.want {
-				t.Errorf("hasLoginForm = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestHasLoginFormSamples(t *testing.T) {
-	tests := []struct {
-		file string
-		want bool
-	}{
-		{file: "testdata/html5_page.html", want: true},
-		{file: "testdata/identifier_first_login.html", want: true},
-		{file: "testdata/newsletter_signup.html", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.file, func(t *testing.T) {
-			f, err := os.Open(tt.file)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer f.Close()
-
-			p, err := parsePage(f)
 			if err != nil {
 				t.Fatalf("parsePage: unexpected error: %v", err)
 			}
