@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -263,6 +264,24 @@ func TestFetchNonHTMLBodyNotRead(t *testing.T) {
 	}
 }
 
+func TestFetchBodyReadError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Length", "100")
+		_, _ = w.Write([]byte("<html>")) // connection closes before 100 bytes arrive
+	}))
+	defer srv.Close()
+
+	_, err := New(testOptions()).Fetch(context.Background(), srv.URL)
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("error = %v, want io.ErrUnexpectedEOF", err)
+	}
+	fe := requireFetchError(t, err, http.StatusBadGateway)
+	if !strings.HasPrefix(fe.Message, "could not fetch ") {
+		t.Errorf("Message = %q", fe.Message)
+	}
+}
+
 func TestFetchTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
@@ -359,6 +378,16 @@ func TestTransportError(t *testing.T) {
 			t.Errorf("error = %v, want the cause unchanged", err)
 		}
 	})
+}
+
+func TestFetchErrorString(t *testing.T) {
+	if got := statusError(http.StatusNotFound).Error(); got != "upstream returned 404 Not Found" {
+		t.Errorf("without cause: %q", got)
+	}
+	err := &FetchError{StatusCode: http.StatusBadGateway, Message: "could not fetch example.com", Err: errors.New("boom")}
+	if got := err.Error(); got != "could not fetch example.com: boom" {
+		t.Errorf("with cause: %q", got)
+	}
 }
 
 func requireFetchError(t *testing.T, err error, wantCode int) *FetchError {
