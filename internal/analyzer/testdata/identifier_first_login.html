@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sign in</title>
+</head>
+<body>
+  <h1>Sign in</h1>
+  <form action="/signin/identifier" method="post">
+    <label for="identifier">Email or phone</label>
+    <input id="identifier" type="email" name="identifier" autocomplete="username webauthn">
+    <button type="submit">Next</button>
+  </form>
+  <a href="/signup">Create account</a>
+</body>
+</html>
