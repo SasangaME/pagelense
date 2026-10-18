@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,6 +17,8 @@ var (
 	ErrTooManyRedirects = errors.New("too many redirects")
 	// ErrBodyTooLarge is returned when a response body is larger than Options.MaxBodyBytes.
 	ErrBodyTooLarge = errors.New("response body too large")
+	// ErrNotHTML is returned when the response is not an HTML document.
+	ErrNotHTML = errors.New("response is not HTML")
 )
 
 // Options controls how pages are fetched.
@@ -82,6 +85,12 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 		return nil, statusError(resp.StatusCode)
 	}
 
+	// checked before reading so non-HTML bodies are not downloaded
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" && !isHTML(contentType) {
+		return nil, contentTypeError(req.URL.Host, contentType)
+	}
+
 	// +1 to detect bodies over the limit
 	body, err := io.ReadAll(io.LimitReader(resp.Body, f.maxBodyBytes+1))
 	if err != nil {
@@ -91,10 +100,26 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 		return nil, transportError(req.URL.Host, fmt.Errorf("%w (limit %d bytes)", ErrBodyTooLarge, f.maxBodyBytes))
 	}
 
+	if contentType == "" {
+		contentType = http.DetectContentType(body)
+		if !isHTML(contentType) {
+			return nil, contentTypeError(req.URL.Host, contentType)
+		}
+	}
+
 	return &Page{
 		URL:         resp.Request.URL,
 		StatusCode:  resp.StatusCode,
-		ContentType: resp.Header.Get("Content-Type"),
+		ContentType: contentType,
 		Body:        body,
 	}, nil
+}
+
+// isHTML reports whether contentType is text/html or application/xhtml+xml.
+func isHTML(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return mediaType == "text/html" || mediaType == "application/xhtml+xml"
 }

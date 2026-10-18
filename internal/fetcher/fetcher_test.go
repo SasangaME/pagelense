@@ -104,8 +104,9 @@ func TestFetchRedirects(t *testing.T) {
 	mux.HandleFunc("/middle", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/final", http.StatusMovedPermanently)
 	})
-	mux.HandleFunc("/final", func(_ http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/final", func(w http.ResponseWriter, r *http.Request) {
 		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "text/html")
 	})
 	mux.HandleFunc("/loop", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/loop", http.StatusFound)
@@ -167,6 +168,7 @@ func TestFetchBodyLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
 				_, _ = w.Write([]byte(strings.Repeat("a", tt.size)))
 			}))
 			defer srv.Close()
@@ -186,6 +188,78 @@ func TestFetchBodyLimit(t *testing.T) {
 				t.Errorf("len(Body) = %d, want %d", len(page.Body), tt.size)
 			}
 		})
+	}
+}
+
+func TestFetchContentType(t *testing.T) {
+	tests := []struct {
+		name       string
+		header     string // empty: no Content-Type header, so the body is sniffed
+		body       string
+		wantErr    bool
+		wantDetect string
+	}{
+		{name: "html", header: "text/html"},
+		{name: "html with charset", header: "text/html; charset=ISO-8859-1"},
+		{name: "html uppercase", header: "TEXT/HTML"},
+		{name: "xhtml", header: "application/xhtml+xml"},
+		{name: "json", header: "application/json", wantErr: true},
+		{name: "plain text", header: "text/plain", wantErr: true},
+		{name: "image", header: "image/png", wantErr: true},
+		{name: "pdf", header: "application/pdf", wantErr: true},
+		{name: "xml", header: "application/xml", wantErr: true},
+		{name: "malformed", header: "text/html;;;=", wantErr: true},
+		{name: "missing, sniffed as html", body: "<!DOCTYPE html><title>x</title>", wantDetect: "text/html; charset=utf-8"},
+		{name: "missing, sniffed as text", body: "just some text", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if tt.header != "" {
+					w.Header().Set("Content-Type", tt.header)
+				} else {
+					w.Header()["Content-Type"] = nil // stop net/http from sniffing on the server side
+				}
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			page, err := New(testOptions()).Fetch(context.Background(), srv.URL)
+			if tt.wantErr {
+				if !errors.Is(err, ErrNotHTML) {
+					t.Fatalf("error = %v, want ErrNotHTML", err)
+				}
+				fe := requireFetchError(t, err, http.StatusUnsupportedMediaType)
+				if !strings.Contains(fe.Message, "is not HTML") {
+					t.Errorf("Message = %q", fe.Message)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Fetch: %v", err)
+			}
+			want := tt.header
+			if want == "" {
+				want = tt.wantDetect
+			}
+			if page.ContentType != want {
+				t.Errorf("ContentType = %q, want %q", page.ContentType, want)
+			}
+		})
+	}
+}
+
+func TestFetchNonHTMLBodyNotRead(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write([]byte(strings.Repeat("a", 1<<20))) // over MaxBodyBytes
+	}))
+	defer srv.Close()
+
+	_, err := New(testOptions()).Fetch(context.Background(), srv.URL)
+	if !errors.Is(err, ErrNotHTML) {
+		t.Fatalf("error = %v, want ErrNotHTML before the size check", err)
 	}
 }
 

@@ -34,6 +34,15 @@ func statusError(code int) *FetchError {
 	return &FetchError{StatusCode: code, Message: msg}
 }
 
+// contentTypeError reports a response that is not HTML.
+func contentTypeError(host, contentType string) *FetchError {
+	return &FetchError{
+		StatusCode: http.StatusUnsupportedMediaType,
+		Message:    fmt.Sprintf("page at %s is not HTML (%s)", host, contentType),
+		Err:        ErrNotHTML,
+	}
+}
+
 // transportError maps a network error to a FetchError; context.Canceled passes through.
 func transportError(host string, err error) error {
 	if errors.Is(err, context.Canceled) {
