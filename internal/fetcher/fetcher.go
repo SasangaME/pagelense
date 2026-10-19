@@ -66,6 +66,11 @@ func New(opts Options) *Fetcher {
 	}
 }
 
+// Client returns the SSRF-safe HTTP client used by f, so other packages can share its dialer and connection pool.
+func (f *Fetcher) Client() *http.Client {
+	return f.client
+}
+
 // Fetch downloads rawURL. HTTP and network failures are returned as *FetchError.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)

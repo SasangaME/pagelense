@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/SasangaME/pagelense/internal/fetcher"
 )
 
 // distinctURLs returns n different URLs on base, so deduplication does not merge them.
@@ -289,5 +291,27 @@ func TestCheckDedupAndCap(t *testing.T) {
 	want := map[string]int{"/a": 1, "/b": 1, "/c": 1}
 	if !maps.Equal(hits, want) {
 		t.Errorf("requests per path = %v, want %v", hits, want)
+	}
+}
+
+func TestCheckSharesFetcherClient(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		hits.Add(1)
+	}))
+	defer srv.Close()
+
+	// AllowPrivateIPs is false, so the fetcher's dialer refuses the loopback test server
+	f := fetcher.New(fetcher.Options{Timeout: time.Second, MaxRedirects: 3, MaxBodyBytes: 1024})
+	results := New(f.Client(), Options{Workers: 1}).Check(context.Background(), []string{srv.URL})
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	if !errors.Is(results[0].Err, fetcher.ErrBlockedAddress) || results[0].Accessible() {
+		t.Errorf("got %+v, want ErrBlockedAddress", results[0])
+	}
+	if hits.Load() != 0 {
+		t.Error("request reached the blocked server")
 	}
 }

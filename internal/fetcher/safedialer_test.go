@@ -88,3 +88,18 @@ func TestFetchBlockedIP(t *testing.T) {
 		t.Error("request reached the blocked server")
 	}
 }
+
+func TestClientBlocksPrivateIPs(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	opts := testOptions()
+	opts.AllowPrivateIPs = false
+	resp, err := New(opts).Client().Get(srv.URL)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
+	if !errors.Is(err, ErrBlockedAddress) {
+		t.Fatalf("error = %v, want ErrBlockedAddress", err)
+	}
+}
