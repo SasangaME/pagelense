@@ -29,11 +29,13 @@ func assertContains(t *testing.T, body string, want ...string) {
 	}
 }
 
-func assertNoScript(t *testing.T, body string) {
+// assertOnlyAppScript checks the page loads app.js and has no other script, inline or external.
+func assertOnlyAppScript(t *testing.T, body string) {
 	t.Helper()
-	if strings.Contains(strings.ToLower(body), "<script") {
-		t.Error("page contains a <script> tag")
+	if n := strings.Count(strings.ToLower(body), "<script"); n != 1 {
+		t.Errorf("page has %d <script> tags, want 1", n)
 	}
+	assertContains(t, body, `<script src="/static/app.js" defer></script>`)
 }
 
 func TestIndexPage(t *testing.T) {
@@ -50,7 +52,7 @@ func TestIndexPage(t *testing.T) {
 		`name="url"`,
 		`<button type="submit">Analyze</button>`,
 	)
-	assertNoScript(t, body)
+	assertOnlyAppScript(t, body)
 }
 
 func TestResultPage(t *testing.T) {
@@ -79,7 +81,7 @@ func TestResultPage(t *testing.T) {
 		`<td>2 <span class="muted">of 16 checked</span></td>`,
 		`value="https://example.com"`, // the form is ready for another analysis
 	)
-	assertNoScript(t, body)
+	assertOnlyAppScript(t, body)
 }
 
 func TestResultPageNoTitleNoLogin(t *testing.T) {
@@ -107,7 +109,7 @@ func TestErrorPage(t *testing.T) {
 	if strings.Contains(body, `"><b>`) {
 		t.Error("submitted URL is not escaped")
 	}
-	assertNoScript(t, body)
+	assertOnlyAppScript(t, body)
 }
 
 func TestErrorPageUnknownStatus(t *testing.T) {
@@ -115,6 +117,31 @@ func TestErrorPageUnknownStatus(t *testing.T) {
 	body := postForm(newRealHandler(t, fake), url.Values{"url": {"https://example.com"}}).Body.String()
 
 	assertContains(t, body, "<h1>Error 599</h1>")
+}
+
+func TestResultPagePartial(t *testing.T) {
+	fake := &fakeAnalyzer{result: analyzer.Result{URL: "https://example.com", HTMLVersion: "HTML5"}}
+	body := postPartial(newRealHandler(t, fake), url.Values{"url": {"https://example.com"}}).Body.String()
+
+	assertContains(t, body, "<h1>Analysis</h1>", `<form class="analyze" method="post" action="/analyze">`)
+	for _, layout := range []string{"<!DOCTYPE", "<header>", "<main>", "<script"} {
+		if strings.Contains(body, layout) {
+			t.Errorf("partial page contains layout markup %q", layout)
+		}
+	}
+}
+
+func TestAppScript(t *testing.T) {
+	w := serve(newRealHandler(t, &fakeAnalyzer{}), http.MethodGet, "/static/app.js")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
+		t.Errorf("Content-Type = %q, want javascript", ct)
+	}
+	// app.js and the server must agree on the header name
+	assertContains(t, w.Body.String(), `"`+partialHeader+`": "1"`)
 }
 
 func TestStylesheet(t *testing.T) {

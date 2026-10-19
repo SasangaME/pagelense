@@ -16,7 +16,7 @@ func TestParsePage(t *testing.T) {
 		wantHeadings Headings
 		wantBase     string
 		wantHrefs    []string
-		wantForms    int
+		wantLogin    bool
 	}{
 		{
 			name: "empty document",
@@ -87,9 +87,9 @@ func TestParsePage(t *testing.T) {
 			wantBase: "/first/",
 		},
 		{
-			name:      "forms collected",
-			html:      `<form></form><div><form><input></form></div>`,
-			wantForms: 2,
+			name:      "login field outside a form",
+			html:      `<form><input type="search"></form><div><input type="password"></div>`,
+			wantLogin: true,
 		},
 	}
 
@@ -111,8 +111,8 @@ func TestParsePage(t *testing.T) {
 			if !slices.Equal(p.hrefs, tt.wantHrefs) {
 				t.Errorf("hrefs = %q, want %q", p.hrefs, tt.wantHrefs)
 			}
-			if len(p.forms) != tt.wantForms {
-				t.Errorf("forms = %d, want %d", len(p.forms), tt.wantForms)
+			if p.hasLogin != tt.wantLogin {
+				t.Errorf("hasLogin = %v, want %v", p.hasLogin, tt.wantLogin)
 			}
 		})
 	}

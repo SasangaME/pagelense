@@ -35,8 +35,20 @@ func newWebHandler(t *testing.T, a Analyzer) http.Handler {
 }
 
 func postForm(h http.Handler, form url.Values) *httptest.ResponseRecorder {
+	return post(h, form, false)
+}
+
+// postPartial posts the form the way app.js does, asking for the page content only.
+func postPartial(h http.Handler, form url.Values) *httptest.ResponseRecorder {
+	return post(h, form, true)
+}
+
+func post(h http.Handler, form url.Values, partial bool) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if partial {
+		req.Header.Set(partialHeader, "1")
+	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	return w
@@ -108,6 +120,47 @@ func TestAnalyzePanicRendersErrorPage(t *testing.T) {
 	}
 	want := "url=https://example.com|error|500|Something went wrong. Please try again."
 	if got := w.Body.String(); got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+func TestAnalyzePartial(t *testing.T) {
+	fake := &fakeAnalyzer{result: analyzer.Result{URL: "https://example.com", HTMLVersion: "HTML5"}}
+	w := postPartial(newWebHandler(t, fake), url.Values{"url": {"https://example.com"}})
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	// no "url=" prefix: the layout is left out
+	want := "result|https://example.com|HTML5||h1=0,h2=0|int=0,ext=0,checked=0,bad=0|login=false"
+	if got := w.Body.String(); got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+	if v := w.Header().Get("Vary"); v != partialHeader {
+		t.Errorf("Vary = %q, want %q", v, partialHeader)
+	}
+}
+
+func TestAnalyzePartialError(t *testing.T) {
+	fake := &fakeAnalyzer{err: errors.New("boom")}
+	w := postPartial(newWebHandler(t, fake), url.Values{"url": {"https://example.com"}})
+
+	status, msg := errorResponse(fake.err)
+	if w.Code != status {
+		t.Fatalf("status = %d, want %d", w.Code, status)
+	}
+	if got, want := w.Body.String(), fmt.Sprintf("error|%d|%s", status, msg); got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+func TestAnalyzePartialPanic(t *testing.T) {
+	w := postPartial(newWebHandler(t, panicAnalyzer{}), url.Values{"url": {"https://example.com"}})
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	if got, want := w.Body.String(), "error|500|Something went wrong. Please try again."; got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}
 }

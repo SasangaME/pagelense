@@ -25,6 +25,21 @@ type Analyzer interface {
 // Server holds the dependencies shared by the handlers.
 type Server struct {
 	analyzer Analyzer
+	pages    pages
+}
+
+// partialHeader marks a request from app.js, which wants only the page content to swap into <main>.
+const partialHeader = "X-Partial"
+
+// render writes the named page: the whole layout, or only its "content" block for a partial request.
+func (s *Server) render(c *gin.Context, status int, name string, data pageData) {
+	block := "layout"
+	if c.GetHeader(partialHeader) != "" {
+		block = "content"
+	}
+	// the same URL returns either form, so caches must key on the header
+	c.Header("Vary", partialHeader)
+	c.Render(status, render.HTML{Template: s.pages[name], Name: block, Data: data})
 }
 
 // New returns the frontend's HTTP handler: web pages, health check and static files, with request IDs, logging and recovery.
@@ -43,7 +58,7 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) 
 		return nil, fmt.Errorf("static files: %w", err)
 	}
 
-	s := &Server{analyzer: a}
+	s := &Server{analyzer: a, pages: pages}
 	r := gin.New()
 	r.HTMLRender = pages
 	r.HandleMethodNotAllowed = true
@@ -55,7 +70,7 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) 
 		middleware.RequestID(),
 		middleware.Logger(log),
 		middleware.Recovery(log, func(c *gin.Context) {
-			c.HTML(http.StatusInternalServerError, "error", pageData{
+			s.render(c, http.StatusInternalServerError, "error", pageData{
 				URL:    c.PostForm("url"),
 				Status: http.StatusInternalServerError,
 				Error:  "Something went wrong. Please try again.",
@@ -66,8 +81,9 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) 
 	r.GET("/", s.handleIndex)
 	r.POST("/analyze", s.handleAnalyze)
 	r.GET("/healthz", s.handleHealth)
-	// a single file instead of StaticFS, which would list directories
+	// single files instead of StaticFS, which would list directories
 	r.StaticFileFS("/static/style.css", "style.css", http.FS(static))
+	r.StaticFileFS("/static/app.js", "app.js", http.FS(static))
 
 	return r, nil
 }

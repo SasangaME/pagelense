@@ -78,13 +78,16 @@ func TestCheckStatuses(t *testing.T) {
 func TestCheckMethodFallback(t *testing.T) {
 	tests := []struct {
 		name        string
+		headStatus  int
 		getStatus   int
 		wantMethods []string
 		wantStatus  int
 	}{
-		{"HEAD allowed", 0, []string{http.MethodHead}, http.StatusOK},
-		{"GET after 405", http.StatusOK, []string{http.MethodHead, http.MethodGet}, http.StatusOK},
-		{"GET after 405 fails", http.StatusNotFound, []string{http.MethodHead, http.MethodGet}, http.StatusNotFound},
+		{"HEAD allowed", http.StatusOK, 0, []string{http.MethodHead}, http.StatusOK},
+		{"GET after 405", http.StatusMethodNotAllowed, http.StatusOK, []string{http.MethodHead, http.MethodGet}, http.StatusOK},
+		{"GET after 405 fails", http.StatusMethodNotAllowed, http.StatusNotFound, []string{http.MethodHead, http.MethodGet}, http.StatusNotFound},
+		{"GET after HEAD 404", http.StatusNotFound, http.StatusOK, []string{http.MethodHead, http.MethodGet}, http.StatusOK},
+		{"GET after HEAD 404 also fails", http.StatusNotFound, http.StatusNotFound, []string{http.MethodHead, http.MethodGet}, http.StatusNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,11 +97,8 @@ func TestCheckMethodFallback(t *testing.T) {
 				mu.Lock()
 				methods = append(methods, r.Method)
 				mu.Unlock()
-				if tt.getStatus == 0 {
-					return // 200 for every method
-				}
 				if r.Method == http.MethodHead {
-					w.WriteHeader(http.StatusMethodNotAllowed)
+					w.WriteHeader(tt.headStatus)
 					return
 				}
 				w.WriteHeader(tt.getStatus)

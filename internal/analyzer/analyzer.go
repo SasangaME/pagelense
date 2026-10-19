@@ -70,7 +70,7 @@ func (a *Analyzer) Analyze(ctx context.Context, rawURL string) (Result, error) {
 			Checked:      checked,
 			Inaccessible: inaccessible,
 		},
-		HasLoginForm: hasLoginForm(p.forms),
+		HasLoginForm: p.hasLogin,
 	}, nil
 }
 

@@ -113,7 +113,7 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	return out
 }
 
-// check sends a HEAD request to rawURL, retrying with GET if the server does not allow HEAD.
+// check sends a HEAD request to rawURL, retrying with GET on an error status, since some servers (e.g. support.google.com) answer HEAD with 404 or 405 for pages GET serves fine.
 func (c *Checker) check(ctx context.Context, rawURL string) Result {
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -121,7 +121,7 @@ func (c *Checker) check(ctx context.Context, rawURL string) Result {
 		defer cancel()
 	}
 	status, err := c.request(ctx, http.MethodHead, rawURL)
-	if err == nil && status == http.StatusMethodNotAllowed {
+	if err == nil && status >= http.StatusBadRequest {
 		status, err = c.request(ctx, http.MethodGet, rawURL)
 	}
 	return Result{URL: rawURL, StatusCode: status, Err: err}

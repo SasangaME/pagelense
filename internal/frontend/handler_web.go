@@ -18,7 +18,7 @@ type pageData struct {
 
 // handleIndex renders the URL form.
 func (s *Server) handleIndex(c *gin.Context) {
-	c.HTML(http.StatusOK, "index", pageData{})
+	s.render(c, http.StatusOK, "index", pageData{})
 }
 
 // handleAnalyze analyzes the submitted URL and renders the result, or the error page with the form still filled in.
@@ -28,8 +28,8 @@ func (s *Server) handleAnalyze(c *gin.Context) {
 	if err != nil {
 		_ = c.Error(err) // for the logging middleware; the page only shows msg
 		status, msg := errorResponse(err)
-		c.HTML(status, "error", pageData{URL: rawURL, Status: status, Error: msg})
+		s.render(c, status, "error", pageData{URL: rawURL, Status: status, Error: msg})
 		return
 	}
-	c.HTML(http.StatusOK, "result", pageData{URL: rawURL, Result: &res})
+	s.render(c, http.StatusOK, "result", pageData{URL: rawURL, Result: &res})
 }

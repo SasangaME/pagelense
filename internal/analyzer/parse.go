@@ -16,10 +16,10 @@ type page struct {
 	headings    Headings
 	baseHref    string
 	hrefs       []string
-	forms       []*html.Node
+	hasLogin    bool
 }
 
-// parsePage parses an HTML document and collects its title, headings, links and forms in a single pass.
+// parsePage parses an HTML document and collects its title, headings, links and login fields in a single pass.
 func parsePage(r io.Reader) (page, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -62,8 +62,10 @@ func parsePage(r io.Reader) (page, error) {
 			if href, ok := attr(n, "href"); ok {
 				p.hrefs = append(p.hrefs, href)
 			}
-		case atom.Form:
-			p.forms = append(p.forms, n)
+		case atom.Input:
+			if isLoginField(n) {
+				p.hasLogin = true
+			}
 		}
 	}
 	return p, nil

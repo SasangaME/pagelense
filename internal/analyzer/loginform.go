@@ -8,23 +8,14 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// hasLoginForm reports whether any of the forms is a login form.
-func hasLoginForm(forms []*html.Node) bool {
-	return slices.ContainsFunc(forms, isLoginForm)
-}
-
-// isLoginForm reports whether the form has a password field, or an autocomplete="username" field as used by identifier-first sign-in.
-func isLoginForm(form *html.Node) bool {
-	for n := range form.Descendants() {
-		if n.Type != html.ElementNode || n.DataAtom != atom.Input {
-			continue
-		}
-		if typ, _ := attr(n, "type"); strings.EqualFold(strings.TrimSpace(typ), "password") {
-			return true
-		}
-		if ac, _ := attr(n, "autocomplete"); slices.Contains(strings.Fields(strings.ToLower(ac)), "username") {
-			return true
-		}
+// isLoginField reports whether n is a password input or an autocomplete="username" input (identifier-first sign-in), even outside a <form>, as script-driven pages like Google's use.
+func isLoginField(n *html.Node) bool {
+	if n.Type != html.ElementNode || n.DataAtom != atom.Input {
+		return false
 	}
-	return false
+	if typ, _ := attr(n, "type"); strings.EqualFold(strings.TrimSpace(typ), "password") {
+		return true
+	}
+	ac, _ := attr(n, "autocomplete")
+	return slices.Contains(strings.Fields(strings.ToLower(ac)), "username")
 }

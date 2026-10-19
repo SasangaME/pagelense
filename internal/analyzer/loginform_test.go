@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestHasLoginForm(t *testing.T) {
+func TestLoginFieldDetection(t *testing.T) {
 	tests := []struct {
 		name string
 		html string
@@ -39,7 +39,14 @@ func TestHasLoginForm(t *testing.T) {
 		{name: "text input named username", html: `<form><input type="text" name="username"></form>`, want: false},
 		{name: "autocomplete email", html: `<form><input type="email" autocomplete="email"></form>`, want: false},
 		{name: "autocomplete token is not a substring match", html: `<form><input autocomplete="nickname"></form>`, want: false},
-		{name: "password outside any form", html: `<div><input type="password"></div>`, want: false},
+		{name: "password outside any form", html: `<div><input type="password"></div>`, want: true},
+		{
+			// Google's sign-in page has no <form>; script submits the fields.
+			name: "formless identifier-first step",
+			html: `<div><input type="text" name="identifier" autocomplete="username webauthn"><div role="button">Next</div></div>`,
+			want: true,
+		},
+		{name: "search input outside any form", html: `<div><input type="search"></div>`, want: false},
 		{name: "password type on non-input element", html: `<form><button type="password">Go</button></form>`, want: false},
 	}
 
@@ -49,8 +56,8 @@ func TestHasLoginForm(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parsePage: unexpected error: %v", err)
 			}
-			if got := hasLoginForm(p.forms); got != tt.want {
-				t.Errorf("hasLoginForm = %v, want %v", got, tt.want)
+			if got := p.hasLogin; got != tt.want {
+				t.Errorf("hasLogin = %v, want %v", got, tt.want)
 			}
 		})
 	}

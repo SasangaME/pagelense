@@ -134,8 +134,8 @@ func TestSamples(t *testing.T) {
 			if !slices.Equal(l.external, tt.wantExternal) {
 				t.Errorf("external = %q, want %q", l.external, tt.wantExternal)
 			}
-			if got := hasLoginForm(p.forms); got != tt.wantLogin {
-				t.Errorf("hasLoginForm = %v, want %v", got, tt.wantLogin)
+			if got := p.hasLogin; got != tt.wantLogin {
+				t.Errorf("hasLogin = %v, want %v", got, tt.wantLogin)
 			}
 		})
 	}
