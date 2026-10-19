@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Recovery logs a panic with its stack and answers 500 through respond, unless the response has already started.
+// Recovery logs panics and answers 500 through respond.
 func Recovery(log *slog.Logger, respond func(c *gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -18,7 +18,6 @@ func Recovery(log *slog.Logger, respond func(c *gin.Context)) gin.HandlerFunc {
 			if p == nil {
 				return
 			}
-			// net/http's signal to abort a response silently; let the server handle it as intended
 			if err, ok := p.(error); ok && errors.Is(err, http.ErrAbortHandler) {
 				panic(p)
 			}

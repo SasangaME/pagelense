@@ -9,7 +9,6 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// page is the raw data collected from a document, before links are classified.
 type page struct {
 	htmlVersion string
 	title       string
@@ -19,7 +18,6 @@ type page struct {
 	hasLogin    bool
 }
 
-// parsePage parses an HTML document and collects its title, headings, links and login fields in a single pass.
 func parsePage(r io.Reader) (page, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -30,7 +28,7 @@ func parsePage(r io.Reader) (page, error) {
 	var titleSeen, baseSeen bool
 
 	for n := range doc.Descendants() {
-		// Skip text nodes and SVG/MathML elements, whose <title> and <a> are not the page's.
+		// SVG and MathML have their own <title> and <a>
 		if n.Type != html.ElementNode || n.Namespace != "" {
 			continue
 		}
@@ -80,7 +78,6 @@ func attr(n *html.Node, key string) (string, bool) {
 	return "", false
 }
 
-// textContent returns the node's text with runs of whitespace collapsed, as browsers do for document.title.
 func textContent(n *html.Node) string {
 	var b strings.Builder
 	for c := range n.Descendants() {

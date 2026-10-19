@@ -19,7 +19,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/linkcheck"
 )
 
-// the wrappers must fit where the services use them
 var (
 	_ api.Analyzer         = InstrumentAnalyzer(prometheus.NewRegistry(), nil)
 	_ frontend.Analyzer    = InstrumentBackend(prometheus.NewRegistry(), nil)
@@ -59,7 +58,6 @@ func TestHTTPMiddleware(t *testing.T) {
 		r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
 	}
 
-	// requests are labeled by route template, so /items/1 and /items/2 share a series
 	if got := testutil.ToFloat64(m.requests.WithLabelValues("GET", "/items/:id", "418")); got != 2 {
 		t.Errorf("route requests = %v, want 2", got)
 	}
@@ -80,7 +78,6 @@ func (f fakeAnalyzer) Analyze(context.Context, string) (analyzer.Result, error) 
 	return analyzer.Result{URL: "https://example.com"}, f.err
 }
 
-// observations returns how many observations the histogram name has for the given outcome.
 func observations(t *testing.T, reg *prometheus.Registry, name, outcome string) uint64 {
 	t.Helper()
 	families, err := reg.Gather()
@@ -121,7 +118,7 @@ func TestInstrumentBackendErrors(t *testing.T) {
 		name       string
 		err        error
 		outcome    string
-		wantStatus string // "" means no error counted
+		wantStatus string
 	}{
 		{"ok", nil, outcomeOK, ""},
 		{"timeout", &frontend.APIError{Status: http.StatusGatewayTimeout, Message: "slow"}, outcomeError, "504"},
@@ -170,7 +167,6 @@ func TestInstrumentChecker(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	c := InstrumentChecker(reg, fakeChecker{results: results})
 
-	// 6 unique URLs (a.example is listed twice), 4 results: 2 were skipped
 	urls := []string{"https://a.example", "https://a.example", "https://b.example", "https://c.example",
 		"https://d.example", "https://e.example", "https://f.example"}
 	if got := c.Check(t.Context(), urls); len(got) != len(results) {

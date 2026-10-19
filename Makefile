@@ -1,15 +1,13 @@
-BIN_DIR := bin
-COVER   := coverage.out
-# make cover fails when total statement coverage is below this percentage.
+BIN_DIR   := bin
+COVER     := coverage.out
 COVER_MIN := 70
 
-# Load local settings from .env if it exists (see .env.example).
+# Load .env if it exists.
 ifneq (,$(wildcard .env))
 include .env
 export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .env)
 endif
 
-# Both services read PORT and ADMIN_PORT, so each target sets its own on top of .env.
 API_PORT       := 8081
 API_ADMIN_PORT := 9091
 WEB_PORT       := 8080

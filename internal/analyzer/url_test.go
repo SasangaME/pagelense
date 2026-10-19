@@ -54,7 +54,6 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
-// The message is shown to the user as is, so it must explain the input without Go's url.Error wrapping.
 func TestParseURLMessages(t *testing.T) {
 	tests := []struct {
 		raw  string

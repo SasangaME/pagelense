@@ -11,7 +11,6 @@ const (
 	versionUnknown = "Unknown"
 )
 
-// legacyDoctypes maps DOCTYPE public identifiers to the HTML version they declare.
 var legacyDoctypes = []struct {
 	publicID string
 	version  string
@@ -25,7 +24,6 @@ var legacyDoctypes = []struct {
 	{"-//W3C//DTD XHTML 1.1//EN", "XHTML 1.1"},
 }
 
-// htmlVersion reports the HTML version declared by the document's DOCTYPE.
 func htmlVersion(doc *html.Node) string {
 	for n := range doc.ChildNodes() {
 		if n.Type == html.DoctypeNode {

@@ -12,7 +12,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/linkcheck"
 )
 
-// the real implementations must satisfy the interfaces the analyzer declares
 var (
 	_ Fetcher     = (*fetcher.Fetcher)(nil)
 	_ LinkChecker = (*linkcheck.Checker)(nil)
@@ -31,11 +30,10 @@ func (f *fakeFetcher) Fetch(_ context.Context, rawURL string) (*fetcher.Page, er
 	return f.page, f.err
 }
 
-// fakeChecker answers each unique URL with the status in statuses (200 when missing), up to limit URLs if limit > 0.
 type fakeChecker struct {
 	statuses map[string]int
 	limit    int
-	cancel   context.CancelFunc // called during Check, to simulate the request being canceled mid-check
+	cancel   context.CancelFunc
 	gotURLs  []string
 }
 
@@ -113,11 +111,10 @@ func TestAnalyze(t *testing.T) {
 	}
 
 	want := Result{
-		URL:         "https://example.com/",
-		HTMLVersion: "HTML5",
-		Title:       "Shop Home",
-		Headings:    Headings{H1: 1, H2: 2, H3: 1},
-		// the duplicate /products link is counted, and checked, twice
+		URL:          "https://example.com/",
+		HTMLVersion:  "HTML5",
+		Title:        "Shop Home",
+		Headings:     Headings{H1: 1, H2: 2, H3: 1},
 		Links:        LinkStats{Internal: 3, External: 2, Checked: 5, Inaccessible: 2},
 		HasLoginForm: true,
 	}
@@ -157,7 +154,6 @@ func TestAnalyzeFetchError(t *testing.T) {
 }
 
 func TestAnalyzeRedirect(t *testing.T) {
-	// the page was requested at example.com but served from www.example.com after a redirect
 	body := `<!DOCTYPE html><a href="/about">About</a><a href="https://example.com/">Old host</a>`
 	f := &fakeFetcher{page: htmlPage(t, "https://www.example.com/home/", body)}
 
@@ -178,7 +174,6 @@ func TestAnalyzeLinkCap(t *testing.T) {
 	body := `<!DOCTYPE html>
 <a href="/a">a</a><a href="/b">b</a><a href="/a">a again</a><a href="/c">c</a>`
 	f := &fakeFetcher{page: htmlPage(t, "https://example.com/", body)}
-	// only /a and /b get results; /c is over the cap
 	c := &fakeChecker{limit: 2, statuses: map[string]int{"https://example.com/a": http.StatusGone}}
 
 	got, err := New(f, c).Analyze(t.Context(), "https://example.com/")

@@ -125,7 +125,6 @@ func TestPagesRenderInsideLayout(t *testing.T) {
 		if err := p[name].ExecuteTemplate(w, "layout", "<x>"); err != nil {
 			t.Fatalf("render %s: %v", name, err)
 		}
-		// each page keeps its own "content", and data is HTML-escaped
 		if want := "<main>" + name + " &lt;x&gt;</main>"; w.Body.String() != want {
 			t.Errorf("render %s = %q, want %q", name, w.Body.String(), want)
 		}

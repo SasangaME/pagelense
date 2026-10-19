@@ -23,10 +23,9 @@ import (
 	"github.com/SasangaME/pagelense/internal/serve"
 )
 
-// Fetch limits that are not worth an env var.
 const (
 	maxRedirects = 10
-	maxBodyBytes = 5 << 20 // 5 MiB
+	maxBodyBytes = 5 << 20
 	userAgent    = "pagelense/1.0 (+https://github.com/SasangaME/pagelense)"
 )
 
@@ -62,7 +61,6 @@ func run() error {
 	reg := metrics.NewRegistry()
 	a := metrics.InstrumentAnalyzer(reg, analyzer.New(f, metrics.InstrumentChecker(reg, checker)))
 
-	// the request logger covers what Gin's debug output would print
 	gin.SetMode(gin.ReleaseMode)
 	handler, err := api.New(a, log, metrics.NewHTTP(reg).Middleware())
 	if err != nil {
@@ -75,14 +73,14 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		IdleTimeout:       60 * time.Second,
-		// no WriteTimeout: an analysis can legitimately take FETCH_TIMEOUT plus LINK_BUDGET
+		// no WriteTimeout: an analysis can take FETCH_TIMEOUT + LINK_BUDGET
 	}
 	adminSrv := admin.NewServer(cfg.AdminPort, reg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {
-		// once shutdown starts, a second Ctrl+C gets Go's default handling and exits at once
+		// a second Ctrl+C exits immediately
 		<-ctx.Done()
 		stop()
 	}()

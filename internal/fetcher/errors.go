@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-// FetchError is returned when a page cannot be fetched. Message is user-safe; Err is the cause.
+// FetchError is returned when a page cannot be fetched. Message is safe to show users.
 type FetchError struct {
 	StatusCode int
 	Message    string
@@ -25,7 +25,6 @@ func (e *FetchError) Error() string {
 
 func (e *FetchError) Unwrap() error { return e.Err }
 
-// statusError reports a non-2xx response from the page's host.
 func statusError(host string, code int) *FetchError {
 	msg := fmt.Sprintf("%s returned %d", host, code)
 	if text := http.StatusText(code); text != "" {
@@ -34,7 +33,6 @@ func statusError(host string, code int) *FetchError {
 	return &FetchError{StatusCode: code, Message: msg}
 }
 
-// contentTypeError reports a response that is not HTML.
 func contentTypeError(host, contentType string) *FetchError {
 	return &FetchError{
 		StatusCode: http.StatusUnsupportedMediaType,
@@ -43,7 +41,6 @@ func contentTypeError(host, contentType string) *FetchError {
 	}
 }
 
-// transportError maps a network error to a FetchError; context.Canceled passes through.
 func transportError(host string, err error) error {
 	if errors.Is(err, context.Canceled) {
 		return err

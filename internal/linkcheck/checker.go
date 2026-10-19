@@ -1,4 +1,4 @@
-// Package linkcheck checks link reachability concurrently.
+// Package linkcheck checks whether links are reachable.
 package linkcheck
 
 import (
@@ -10,32 +10,30 @@ import (
 	"time"
 )
 
-// Result is the outcome of checking a single link.
+// Result is the outcome of checking one link.
 type Result struct {
 	URL        string
-	StatusCode int   // 0 when no response was received
-	Err        error // network failure, timeout or cancellation
+	StatusCode int // 0 if there was no response
+	Err        error
 }
 
-// Accessible reports whether the link answered with a non-error status.
+// Accessible reports whether the link answered below 400.
 func (r Result) Accessible() bool {
 	return r.Err == nil && r.StatusCode < 400
 }
 
-// errBudgetExceeded is the cancel cause once Options.Budget runs out, so checks cut short by it can be told apart.
 var errBudgetExceeded = errors.New("link check budget exceeded")
 
 // Options controls how links are checked.
 type Options struct {
-	Workers  int           // number of concurrent checks; values below 1 mean 1
-	Timeout  time.Duration // per link, covering the HEAD and any GET fallback; 0 means no limit
-	Budget   time.Duration // whole Check call; links not finished in time are left out of the results; 0 means no limit
-	MaxLinks int           // most unique URLs checked per call; values below 1 mean no limit
-	// UserAgent is sent with every check; Go's default agent is throttled or refused by many sites.
+	Workers   int
+	Timeout   time.Duration // per link, 0 means none
+	Budget    time.Duration // whole Check call, 0 means none
+	MaxLinks  int           // 0 means no limit
 	UserAgent string
 }
 
-// Checker checks links with a fixed number of workers. It is safe for concurrent use.
+// Checker checks links with a pool of workers.
 type Checker struct {
 	client    *http.Client
 	workers   int
@@ -45,7 +43,7 @@ type Checker struct {
 	userAgent string
 }
 
-// New returns a Checker that sends requests with client.
+// New returns a Checker that uses client.
 func New(client *http.Client, opts Options) *Checker {
 	return &Checker{
 		client:    client,
@@ -57,8 +55,7 @@ func New(client *http.Client, opts Options) *Checker {
 	}
 }
 
-// Check checks the first MaxLinks unique urls concurrently; results are in completion order and omit URLs skipped
-// after ctx is canceled or not finished within the budget.
+// Check checks the unique urls and returns results in completion order.
 func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	urls = unique(urls, c.maxLinks)
 	if c.budget > 0 {
@@ -76,7 +73,7 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 			defer wg.Done()
 			for u := range jobs {
 				r := c.check(ctx, u)
-				// a check cut short by the budget says nothing about the link, so it is not counted as checked
+				// cut off by the budget: not counted as checked
 				if r.Err != nil && errors.Is(context.Cause(ctx), errBudgetExceeded) {
 					continue
 				}
@@ -88,7 +85,7 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	go func() {
 		defer close(jobs)
 		for _, u := range urls {
-			// select picks at random when both cases are ready, so check ctx first
+			// select picks at random when both are ready, so check ctx first
 			if ctx.Err() != nil {
 				return
 			}
@@ -100,7 +97,6 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 		}
 	}()
 
-	// results is closed once every worker has finished
 	go func() {
 		wg.Wait()
 		close(results)
@@ -113,7 +109,7 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	return out
 }
 
-// check sends a HEAD request to rawURL, retrying with GET on an error status, since some servers (e.g. support.google.com) answer HEAD with 404 or 405 for pages GET serves fine.
+// some servers answer HEAD with 404 or 405 but serve GET fine, so retry with GET
 func (c *Checker) check(ctx context.Context, rawURL string) Result {
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -127,7 +123,6 @@ func (c *Checker) check(ctx context.Context, rawURL string) Result {
 	return Result{URL: rawURL, StatusCode: status, Err: err}
 }
 
-// request sends a method request to rawURL and returns the status code without reading the body.
 func (c *Checker) request(ctx context.Context, method, rawURL string) (int, error) {
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
 	if err != nil {
@@ -144,7 +139,6 @@ func (c *Checker) request(ctx context.Context, method, rawURL string) (int, erro
 	return resp.StatusCode, nil
 }
 
-// unique returns urls without duplicates, keeping first occurrences in order, cut to limit if limit > 0.
 func unique(urls []string, limit int) []string {
 	seen := make(map[string]bool, len(urls))
 	out := make([]string, 0, len(urls))

@@ -7,7 +7,6 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	// a failing backend must not fail the frontend's health check
 	fake := &fakeAnalyzer{err: &APIError{Status: http.StatusBadGateway, Message: "unavailable"}}
 	w := serve(newWebHandler(t, fake), http.MethodGet, "/healthz")
 

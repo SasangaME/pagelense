@@ -27,12 +27,11 @@ func newTestClient(t *testing.T, baseURL string, timeout time.Duration) *Client 
 	return c
 }
 
-// fakeBackend answers every request with status and body, and records the last request it got.
 type fakeBackend struct {
 	status int
 	body   string
 
-	mu  sync.Mutex // the handler runs on the server's goroutine
+	mu  sync.Mutex
 	got recordedRequest
 }
 
@@ -40,7 +39,6 @@ type recordedRequest struct {
 	method, path, contentType, requestID, body string
 }
 
-// last returns the last request the backend got.
 func (b *fakeBackend) last() recordedRequest {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -204,7 +202,6 @@ func TestClientErrors(t *testing.T) {
 	}
 }
 
-// newHangingBackend returns a backend that calls onRequest (if set) and never answers until the test ends.
 func newHangingBackend(t *testing.T, onRequest func()) *httptest.Server {
 	t.Helper()
 	release := make(chan struct{})
@@ -218,13 +215,13 @@ func newHangingBackend(t *testing.T, onRequest func()) *httptest.Server {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	t.Cleanup(func() { close(release) }) // cleanups run last-in first-out, so this runs before srv.Close
+	t.Cleanup(func() { close(release) }) // runs before srv.Close
 	return srv
 }
 
 func TestClientUnreachable(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
-	srv.Close() // nothing listens on the address any more, so the dial is refused
+	srv.Close()
 
 	_, err := newTestClient(t, srv.URL, time.Second).Analyze(context.Background(), "https://example.com")
 	assertAPIError(t, err, http.StatusBadGateway, "analysis service is unavailable, try again later")

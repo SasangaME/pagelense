@@ -26,7 +26,7 @@ func TestIsBlocked(t *testing.T) {
 		{ip: "fe80::1", want: true},
 		{ip: "0.0.0.0", want: true},
 		{ip: "::", want: true},
-		{ip: "100.100.100.200", want: true}, // carrier-grade NAT range
+		{ip: "100.100.100.200", want: true}, // CGNAT
 		{ip: "224.0.0.1", want: true},
 		{ip: "255.255.255.255", want: true},
 		{ip: "::ffff:127.0.0.1", want: true}, // IPv4-mapped loopback
@@ -70,7 +70,7 @@ func TestFetchBlockedIP(t *testing.T) {
 	opts.AllowPrivateIPs = false
 	f := New(opts)
 
-	// localhost resolves through the hosts file, so the check must run after DNS
+	// localhost resolves via the hosts file, so this checks the dial, not the URL
 	port := srv.URL[strings.LastIndex(srv.URL, ":")+1:]
 	for _, u := range []string{srv.URL, "http://localhost:" + port} {
 		t.Run(u, func(t *testing.T) {

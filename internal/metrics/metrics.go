@@ -1,4 +1,4 @@
-// Package metrics defines the Prometheus collectors for the application.
+// Package metrics defines the Prometheus metrics.
 package metrics
 
 import (
@@ -18,38 +18,35 @@ import (
 
 const namespace = "pagelense"
 
-// unmatchedRoute labels requests no route matched, so unknown paths cannot create new series.
 const unmatchedRoute = "unmatched"
 
-// Outcome label values.
 const (
 	outcomeOK       = "ok"
 	outcomeError    = "error"
-	outcomeCanceled = "canceled" // the caller went away; says nothing about the service
+	outcomeCanceled = "canceled"
 )
 
-// Link check outcome label values.
 const (
-	linkAccessible   = "accessible"   // answered below 400
-	linkInaccessible = "inaccessible" // answered 400 or above
-	linkFailed       = "failed"       // no response: network error or per-link timeout
-	linkSkipped      = "skipped"      // over MAX_LINKS, or cut by LINK_BUDGET or cancellation
+	linkAccessible   = "accessible"
+	linkInaccessible = "inaccessible"
+	linkFailed       = "failed"
+	linkSkipped      = "skipped"
 )
 
-// NewRegistry returns a registry with the Go runtime and process collectors, one per service.
+// NewRegistry returns a registry with the Go and process collectors.
 func NewRegistry() *prometheus.Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	return reg
 }
 
-// HTTP counts and times the requests a service handles.
+// HTTP counts and times requests.
 type HTTP struct {
 	requests *prometheus.CounterVec
 	duration *prometheus.HistogramVec
 }
 
-// NewHTTP registers the request collectors with reg.
+// NewHTTP registers the HTTP metrics with reg.
 func NewHTTP(reg prometheus.Registerer) *HTTP {
 	m := &HTTP{
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -61,15 +58,14 @@ func NewHTTP(reg prometheus.Registerer) *HTTP {
 			Namespace: namespace,
 			Name:      "http_request_duration_seconds",
 			Help:      "Time to handle an HTTP request, by method and route.",
-			// an analysis takes up to FETCH_TIMEOUT + LINK_BUDGET (20s by default); everything else is milliseconds
-			Buckets: []float64{.005, .01, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30},
+			Buckets:   []float64{.005, .01, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30},
 		}, []string{"method", "route"}),
 	}
 	reg.MustRegister(m.requests, m.duration)
 	return m
 }
 
-// Middleware records each request under its route template (e.g. /api/v1/analyze), not the raw path.
+// Middleware records each request by route template.
 func (m *HTTP) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -85,21 +81,20 @@ func (m *HTTP) Middleware() gin.HandlerFunc {
 	}
 }
 
-// Analyzer analyzes a web page; both services' handlers depend on this method.
+// Analyzer analyzes a web page.
 type Analyzer interface {
 	Analyze(ctx context.Context, rawURL string) (analyzer.Result, error)
 }
 
-// LinkChecker checks links; *linkcheck.Checker implements it.
+// LinkChecker checks links.
 type LinkChecker interface {
 	Check(ctx context.Context, urls []string) []linkcheck.Result
 }
 
-// timedAnalyzer records how long each Analyze call takes, by outcome.
 type timedAnalyzer struct {
 	next     Analyzer
 	duration *prometheus.HistogramVec
-	errors   *prometheus.CounterVec // nil when the caller does not count errors by status
+	errors   *prometheus.CounterVec // nil for the backend
 }
 
 func (t *timedAnalyzer) Analyze(ctx context.Context, rawURL string) (analyzer.Result, error) {
@@ -112,7 +107,6 @@ func (t *timedAnalyzer) Analyze(ctx context.Context, rawURL string) (analyzer.Re
 	return res, err
 }
 
-// outcome labels an error as ok, canceled or error.
 func outcome(err error) string {
 	switch {
 	case err == nil:
@@ -124,10 +118,9 @@ func outcome(err error) string {
 	}
 }
 
-// analysisBuckets cover a quick page (under a second) up to the default worst case of FETCH_TIMEOUT + LINK_BUDGET.
 var analysisBuckets = []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 15, 20, 30}
 
-// InstrumentAnalyzer wraps the backend's analyzer to record analysis duration, by outcome.
+// InstrumentAnalyzer records how long each analysis takes.
 func InstrumentAnalyzer(reg prometheus.Registerer, a Analyzer) Analyzer {
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: namespace,
@@ -139,7 +132,7 @@ func InstrumentAnalyzer(reg prometheus.Registerer, a Analyzer) Analyzer {
 	return &timedAnalyzer{next: a, duration: duration}
 }
 
-// InstrumentBackend wraps the frontend's API client to record call duration by outcome, and errors by status.
+// InstrumentBackend records backend call durations and errors.
 func InstrumentBackend(reg prometheus.Registerer, a Analyzer) Analyzer {
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: namespace,
@@ -156,7 +149,6 @@ func InstrumentBackend(reg prometheus.Registerer, a Analyzer) Analyzer {
 	return &timedAnalyzer{next: a, duration: duration, errors: errs}
 }
 
-// backendStatus is the status the frontend shows for err; anything that is not an APIError is shown as 502.
 func backendStatus(err error) string {
 	var apiErr *frontend.APIError
 	if errors.As(err, &apiErr) {
@@ -165,20 +157,19 @@ func backendStatus(err error) string {
 	return "502"
 }
 
-// countedChecker counts the outcome of every unique link it is asked to check.
 type countedChecker struct {
 	next   LinkChecker
 	checks *prometheus.CounterVec
 }
 
-// InstrumentChecker wraps the backend's link checker to count link-check outcomes.
+// InstrumentChecker counts link check outcomes.
 func InstrumentChecker(reg prometheus.Registerer, c LinkChecker) LinkChecker {
 	checks := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "link_checks_total",
 		Help:      "Unique links per analysis, by outcome: accessible, inaccessible (4xx/5xx), failed (no response) or skipped (over the cap, budget or canceled).",
 	}, []string{"outcome"})
-	// start every outcome at 0, so rate() works before the first failure
+	// export every outcome from the start
 	for _, o := range []string{linkAccessible, linkInaccessible, linkFailed, linkSkipped} {
 		checks.WithLabelValues(o)
 	}
@@ -191,7 +182,7 @@ func (c *countedChecker) Check(ctx context.Context, urls []string) []linkcheck.R
 	for _, r := range results {
 		c.checks.WithLabelValues(linkOutcome(r)).Inc()
 	}
-	// the checker returns one result per unique URL it finished, so the rest were skipped
+	// links without a result were skipped
 	if skipped := countUnique(urls) - len(results); skipped > 0 {
 		c.checks.WithLabelValues(linkSkipped).Add(float64(skipped))
 	}

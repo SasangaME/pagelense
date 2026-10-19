@@ -14,7 +14,6 @@ import (
 
 var discardLogger = slog.New(slog.DiscardHandler)
 
-// freeAddr returns a local address nothing is listening on.
 func freeAddr(t *testing.T) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -26,7 +25,6 @@ func freeAddr(t *testing.T) string {
 	return addr
 }
 
-// waitUp waits until addr accepts connections.
 func waitUp(t *testing.T, addr string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
@@ -49,7 +47,6 @@ func newServer(name string, addr string, h http.HandlerFunc) Server {
 
 func ok(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok") }
 
-// start runs Run in the background and returns its result channel once every server is up.
 func start(t *testing.T, ctx context.Context, timeout time.Duration, servers ...Server) <-chan error {
 	t.Helper()
 	done := make(chan error, 1)
@@ -91,7 +88,6 @@ func TestRunServesAndStopsCleanly(t *testing.T) {
 	if err := wait(t, done); err != nil {
 		t.Fatalf("Run = %v, want nil after a clean shutdown", err)
 	}
-	// both servers are closed, not only the one that was asked
 	for _, addr := range []string{app, admin} {
 		if conn, err := net.Dial("tcp", addr); err == nil {
 			_ = conn.Close()
@@ -128,7 +124,7 @@ func TestRunLetsInFlightRequestsFinish(t *testing.T) {
 	}()
 
 	<-started
-	cancel() // shutdown begins while the request is still running
+	cancel()
 	time.Sleep(50 * time.Millisecond)
 	select {
 	case err := <-done:
@@ -151,7 +147,7 @@ func TestRunCutsOffRequestsAfterTimeout(t *testing.T) {
 	canceled := make(chan struct{})
 	stuck := func(_ http.ResponseWriter, r *http.Request) {
 		close(started)
-		<-r.Context().Done() // closing the connection cancels the request
+		<-r.Context().Done()
 		close(canceled)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
@@ -193,7 +189,6 @@ func TestRunPortInUse(t *testing.T) {
 	if err == nil || !strings.HasPrefix(err.Error(), "admin server:") {
 		t.Fatalf("Run = %v, want an admin server listen error", err)
 	}
-	// the app listener opened before the failure is released again
 	ln, err := net.Listen("tcp", free)
 	if err != nil {
 		t.Errorf("app address still held after a failed start: %v", err)
@@ -202,7 +197,6 @@ func TestRunPortInUse(t *testing.T) {
 	}
 }
 
-// brokenListener fails on Accept, as a listener does when its socket breaks.
 type brokenListener struct{ net.Listener }
 
 func (brokenListener) Accept() (net.Conn, error) { return nil, errors.New("accept: socket broken") }
@@ -218,12 +212,10 @@ func TestRunStopsWhenAServerFails(t *testing.T) {
 	}
 	servers := []Server{newServer("app", "", ok), newServer("admin", "", ok)}
 
-	// ctx is never canceled: the failing admin server alone must stop the service
 	err = serve(t.Context(), discardLogger, time.Second, servers, []net.Listener{appLn, brokenListener{adminLn}})
 	if err == nil || !strings.Contains(err.Error(), "admin server: accept: socket broken") {
 		t.Fatalf("serve = %v, want the admin server's error", err)
 	}
-	// the healthy app server is shut down too
 	if conn, err := net.Dial("tcp", appLn.Addr().String()); err == nil {
 		_ = conn.Close()
 		t.Error("app server still accepts connections after the admin server failed")

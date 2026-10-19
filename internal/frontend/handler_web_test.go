@@ -14,7 +14,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/analyzer"
 )
 
-// testPages print the page data as plain text, so tests check what handlers pass rather than the real markup.
 var testPages = fstest.MapFS{
 	"templates/layout.html": {Data: []byte(`{{define "layout"}}url={{.URL}}|{{template "content" .}}{{end}}`)},
 	"templates/index.html":  {Data: []byte(`{{define "content"}}index{{end}}`)},
@@ -38,7 +37,6 @@ func postForm(h http.Handler, form url.Values) *httptest.ResponseRecorder {
 	return post(h, form, false)
 }
 
-// postPartial posts the form the way app.js does, asking for the page content only.
 func postPartial(h http.Handler, form url.Values) *httptest.ResponseRecorder {
 	return post(h, form, true)
 }
@@ -99,7 +97,6 @@ func TestAnalyzeErrorKeepsURL(t *testing.T) {
 	if w.Code != status {
 		t.Fatalf("status = %d, want %d", w.Code, status)
 	}
-	// the URL is HTML-escaped, so user input cannot inject markup
 	want := fmt.Sprintf("url=https://example.com/&lt;x&gt;|error|%d|%s", status, msg)
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)
@@ -131,7 +128,6 @@ func TestAnalyzePartial(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	// no "url=" prefix: the layout is left out
 	want := "result|https://example.com|HTML5||h1=0,h2=0|int=0,ext=0,checked=0,bad=0|login=false"
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)

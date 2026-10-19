@@ -31,7 +31,6 @@ type fakeAnalyzer struct {
 	called       bool
 }
 
-// Analyze records its inputs and, like the real analyzer, returns the context error once the request is canceled.
 func (f *fakeAnalyzer) Analyze(ctx context.Context, rawURL string) (analyzer.Result, error) {
 	f.called = true
 	f.gotURL = rawURL
@@ -116,7 +115,6 @@ func TestExtraMiddlewareSeesFinalStatus(t *testing.T) {
 	}
 	postJSON(h, `{"url": "https://example.com"}`)
 
-	// extra middleware wraps recovery, so a recovered panic is seen as the 500 it was answered with
 	if got != http.StatusInternalServerError {
 		t.Errorf("middleware saw status %d, want 500", got)
 	}

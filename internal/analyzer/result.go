@@ -10,7 +10,7 @@ type Result struct {
 	HasLoginForm bool      `json:"has_login_form"`
 }
 
-// Headings holds the number of headings found at each level.
+// Headings counts the headings at each level.
 type Headings struct {
 	H1 int `json:"h1"`
 	H2 int `json:"h2"`

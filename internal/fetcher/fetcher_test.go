@@ -18,11 +18,10 @@ import (
 
 func testOptions() Options {
 	return Options{
-		Timeout:      2 * time.Second,
-		MaxRedirects: 3,
-		MaxBodyBytes: 1024,
-		UserAgent:    "pagelense-test/1.0",
-		// httptest servers listen on loopback
+		Timeout:         2 * time.Second,
+		MaxRedirects:    3,
+		MaxBodyBytes:    1024,
+		UserAgent:       "pagelense-test/1.0",
 		AllowPrivateIPs: true,
 	}
 }
@@ -71,7 +70,6 @@ func TestFetchNon2xx(t *testing.T) {
 
 			_, err := New(testOptions()).Fetch(context.Background(), srv.URL)
 			fe := requireFetchError(t, err, tt.code)
-			// the message names the page's host (host:port for httptest)
 			if want := strings.TrimPrefix(srv.URL, "http://") + " " + tt.wantMsg; fe.Message != want {
 				t.Errorf("Message = %q, want %q", fe.Message, want)
 			}
@@ -82,7 +80,7 @@ func TestFetchNon2xx(t *testing.T) {
 func TestFetchConnectionRefused(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	addr := srv.URL
-	srv.Close() // nothing listens on addr any more
+	srv.Close()
 
 	_, err := New(testOptions()).Fetch(context.Background(), addr)
 	fe := requireFetchError(t, err, http.StatusBadGateway)
@@ -190,7 +188,7 @@ func TestFetchBodyLimit(t *testing.T) {
 func TestFetchContentType(t *testing.T) {
 	tests := []struct {
 		name    string
-		header  string // empty: no Content-Type header, so the body is sniffed
+		header  string
 		body    string
 		wantErr bool
 	}{
@@ -214,7 +212,7 @@ func TestFetchContentType(t *testing.T) {
 				if tt.header != "" {
 					w.Header().Set("Content-Type", tt.header)
 				} else {
-					w.Header()["Content-Type"] = nil // stop net/http from sniffing on the server side
+					w.Header()["Content-Type"] = nil // stop net/http from sniffing
 				}
 				_, _ = w.Write([]byte(tt.body))
 			}))
@@ -258,7 +256,7 @@ func TestFetchBodyReadError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.Header().Set("Content-Length", "100")
-		_, _ = w.Write([]byte("<html>")) // connection closes before 100 bytes arrive
+		_, _ = w.Write([]byte("<html>"))
 	}))
 	defer srv.Close()
 

@@ -128,7 +128,6 @@ button:disabled {
   cursor: progress;
 }
 
-/* app.js adds .loading while the analysis runs */
 button.loading {
   display: inline-flex;
   align-items: center;

@@ -19,12 +19,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// newLogger returns a JSON logger at debug level that writes to buf.
 func newLogger(buf *bytes.Buffer) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 }
 
-// logLines decodes each JSON log line in buf.
 func logLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
 	t.Helper()
 	var lines []map[string]any
@@ -38,7 +36,6 @@ func logLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
 	return lines
 }
 
-// newEngine builds an engine with the middleware in the order the services use.
 func newEngine(log *slog.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(RequestID(), Logger(log), Recovery(log, func(c *gin.Context) {
@@ -51,7 +48,7 @@ func get(h http.Handler, path string, header http.Header) *httptest.ResponseReco
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	for k, vs := range header {
 		for _, v := range vs {
-			req.Header.Add(k, v) // canonicalizes the key, as a real request would
+			req.Header.Add(k, v)
 		}
 	}
 	w := httptest.NewRecorder()
@@ -234,7 +231,6 @@ func TestRecoveryAfterResponseStarted(t *testing.T) {
 
 	w := get(r, "/half", nil)
 
-	// the status and body already sent cannot be replaced, and respond must not append to them
 	if w.Code != http.StatusOK || w.Body.String() != "partial" {
 		t.Errorf("got %d %q, want the original 200 \"partial\"", w.Code, w.Body.String())
 	}

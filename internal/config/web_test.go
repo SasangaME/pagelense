@@ -103,10 +103,8 @@ func TestLoadWebReportsAllErrors(t *testing.T) {
 	}
 }
 
-// TestDefaultAPITimeoutOutlastsBackend keeps the frontend from giving up on an analysis the backend would still finish.
 func TestDefaultAPITimeoutOutlastsBackend(t *testing.T) {
 	be := Default()
-	// the budget cancels checks still in flight, so link checks never take longer than it
 	worstCase := be.FetchTimeout + be.LinkBudget
 
 	if got := DefaultWeb().APITimeout; got <= worstCase {

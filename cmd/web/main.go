@@ -42,7 +42,6 @@ func run() error {
 
 	reg := metrics.NewRegistry()
 
-	// the request logger covers what Gin's debug output would print
 	gin.SetMode(gin.ReleaseMode)
 	handler, err := frontend.New(metrics.InstrumentBackend(reg, client), log, metrics.NewHTTP(reg).Middleware())
 	if err != nil {
@@ -55,14 +54,13 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		IdleTimeout:       60 * time.Second,
-		// no WriteTimeout: a result page waits up to API_TIMEOUT for the backend
 	}
 	adminSrv := admin.NewServer(cfg.AdminPort, reg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {
-		// once shutdown starts, a second Ctrl+C gets Go's default handling and exits at once
+		// a second Ctrl+C exits immediately
 		<-ctx.Done()
 		stop()
 	}()

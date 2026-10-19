@@ -1,4 +1,4 @@
-// Package fetcher downloads web pages with timeouts, size limits and an SSRF-safe dialer.
+// Package fetcher downloads web pages.
 package fetcher
 
 import (
@@ -13,38 +13,38 @@ import (
 )
 
 var (
-	// ErrTooManyRedirects is returned when a page redirects more than Options.MaxRedirects times.
+	// ErrTooManyRedirects is returned after Options.MaxRedirects redirects.
 	ErrTooManyRedirects = errors.New("too many redirects")
-	// ErrBodyTooLarge is returned when a response body is larger than Options.MaxBodyBytes.
+	// ErrBodyTooLarge is returned for bodies over Options.MaxBodyBytes.
 	ErrBodyTooLarge = errors.New("response body too large")
-	// ErrNotHTML is returned when the response is not an HTML document.
+	// ErrNotHTML is returned for responses that are not HTML.
 	ErrNotHTML = errors.New("response is not HTML")
 )
 
 // Options controls how pages are fetched.
 type Options struct {
-	Timeout      time.Duration // whole request, including redirects and reading the body
-	MaxRedirects int           // 0 means redirects are not followed
+	Timeout      time.Duration
+	MaxRedirects int // 0 means redirects are not followed
 	MaxBodyBytes int64
 	UserAgent    string
-	// AllowPrivateIPs disables the SSRF check; only for tests against local servers.
+	// AllowPrivateIPs is for tests against local servers.
 	AllowPrivateIPs bool
 }
 
 // Page is a downloaded HTML page.
 type Page struct {
-	URL  *url.URL // final URL after redirects; relative links resolve against it
+	URL  *url.URL // after redirects
 	Body []byte
 }
 
-// Fetcher downloads web pages. It is safe for concurrent use.
+// Fetcher downloads web pages.
 type Fetcher struct {
 	client       *http.Client
 	maxBodyBytes int64
 	userAgent    string
 }
 
-// New returns a Fetcher configured by opts.
+// New returns a Fetcher.
 func New(opts Options) *Fetcher {
 	maxRedirects := opts.MaxRedirects
 	return &Fetcher{
@@ -52,7 +52,6 @@ func New(opts Options) *Fetcher {
 			Timeout:   opts.Timeout,
 			Transport: newTransport(opts.AllowPrivateIPs),
 			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-				// len(via) == number of redirects including this one
 				if len(via) > maxRedirects {
 					return fmt.Errorf("%w (limit %d)", ErrTooManyRedirects, maxRedirects)
 				}
@@ -64,12 +63,12 @@ func New(opts Options) *Fetcher {
 	}
 }
 
-// Client returns the SSRF-safe HTTP client used by f, so other packages can share its dialer and connection pool.
+// Client returns the HTTP client, so link checks can share its dialer and pool.
 func (f *Fetcher) Client() *http.Client {
 	return f.client
 }
 
-// Fetch downloads rawURL. HTTP and network failures are returned as *FetchError.
+// Fetch downloads rawURL. Failures are returned as *FetchError.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -88,7 +87,6 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 		return nil, statusError(req.URL.Host, resp.StatusCode)
 	}
 
-	// checked before reading so non-HTML bodies are not downloaded
 	contentType := resp.Header.Get("Content-Type")
 	if contentType != "" && !isHTML(contentType) {
 		return nil, contentTypeError(req.URL.Host, contentType)
@@ -113,7 +111,6 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 	return &Page{URL: resp.Request.URL, Body: body}, nil
 }
 
-// isHTML reports whether contentType is text/html or application/xhtml+xml.
 func isHTML(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {

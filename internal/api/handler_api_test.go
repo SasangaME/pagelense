@@ -28,7 +28,6 @@ func newAPIHandler(t *testing.T, a Analyzer) http.Handler {
 	return h
 }
 
-// decodeError checks that w is a JSON error body whose status matches the HTTP status.
 func decodeError(t *testing.T, w *httptest.ResponseRecorder, wantStatus int) errorDetail {
 	t.Helper()
 	if w.Code != wantStatus {
@@ -105,7 +104,6 @@ func TestAnalyzeBodyTooLarge(t *testing.T) {
 }
 
 func TestAnalyzeMissingURLIsPassedOn(t *testing.T) {
-	// an empty or missing url is the analyzer's to reject, so the API and the web form report it the same way
 	fake := &fakeAnalyzer{err: analyzer.ErrInvalidURL}
 	w := postJSON(newAPIHandler(t, fake), `{}`)
 	if !fake.called || fake.gotURL != "" {

@@ -9,8 +9,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/analyzer"
 )
 
-// These tests render the real templates in web/, so they check the markup the browser gets.
-
 func newRealHandler(t *testing.T, a Analyzer) http.Handler {
 	t.Helper()
 	h, err := New(a, discardLogger)
@@ -29,7 +27,6 @@ func assertContains(t *testing.T, body string, want ...string) {
 	}
 }
 
-// assertOnlyAppScript checks the page loads app.js and has no other script, inline or external.
 func assertOnlyAppScript(t *testing.T, body string) {
 	t.Helper()
 	if n := strings.Count(strings.ToLower(body), "<script"); n != 1 {
@@ -103,7 +100,6 @@ func TestErrorPage(t *testing.T) {
 		`<section class="error" role="alert">`,
 		"<h1>Error 404 Not Found</h1>",
 		"<p>example.com returned 404 Not Found</p>",
-		// the submitted URL stays in the form, escaped so it cannot break out of the attribute
 		`value="https://example.com/missing?q=&#34;&gt;&lt;b&gt;"`,
 	)
 	if strings.Contains(body, `"><b>`) {
@@ -140,7 +136,6 @@ func TestAppScript(t *testing.T) {
 	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
 		t.Errorf("Content-Type = %q, want javascript", ct)
 	}
-	// app.js and the server must agree on the header name
 	assertContains(t, w.Body.String(), `"`+partialHeader+`": "1"`)
 }
 

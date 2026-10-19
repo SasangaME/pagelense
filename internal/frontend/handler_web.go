@@ -8,25 +8,22 @@ import (
 	"github.com/SasangaME/pagelense/internal/analyzer"
 )
 
-// pageData is what every page template receives; each page uses the fields it needs.
 type pageData struct {
-	URL    string           // submitted URL, kept in the form so the user can fix it
-	Result *analyzer.Result // result page only
-	Status int              // error page only
-	Error  string           // error page only
+	URL    string
+	Result *analyzer.Result
+	Status int
+	Error  string
 }
 
-// handleIndex renders the URL form.
 func (s *server) handleIndex(c *gin.Context) {
 	s.render(c, http.StatusOK, "index", pageData{})
 }
 
-// handleAnalyze analyzes the submitted URL and renders the result, or the error page with the form still filled in.
 func (s *server) handleAnalyze(c *gin.Context) {
 	rawURL := c.PostForm("url")
 	res, err := s.analyzer.Analyze(c.Request.Context(), rawURL)
 	if err != nil {
-		_ = c.Error(err) // for the logging middleware; the page only shows msg
+		_ = c.Error(err)
 		status, msg := errorResponse(err)
 		s.render(c, status, "error", pageData{URL: rawURL, Status: status, Error: msg})
 		return

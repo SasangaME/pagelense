@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-// WebConfig holds the frontend's settings. The zero value is not valid; use LoadWeb.
+// WebConfig holds the frontend's settings.
 type WebConfig struct {
-	Port            int           // PORT: public web server
-	AdminPort       int           // ADMIN_PORT: /metrics and /debug/pprof, never exposed publicly
-	LogLevel        slog.Level    // LOG_LEVEL: debug, info, warn or error
-	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: how long in-flight requests get to finish on Ctrl+C or SIGTERM
-	APIURL          string        // API_URL: backend base URL, e.g. http://localhost:8081
-	APITimeout      time.Duration // API_TIMEOUT: whole backend call; must outlast the backend's fetch plus link checks
+	Port            int           // PORT
+	AdminPort       int           // ADMIN_PORT
+	LogLevel        slog.Level    // LOG_LEVEL
+	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT
+	APIURL          string        // API_URL
+	APITimeout      time.Duration // API_TIMEOUT
 }
 
-// DefaultWeb returns the frontend settings used for variables that are unset or empty.
+// DefaultWeb returns the frontend defaults.
 func DefaultWeb() WebConfig {
 	return WebConfig{
 		Port:            8080,
@@ -25,12 +25,12 @@ func DefaultWeb() WebConfig {
 		LogLevel:        slog.LevelInfo,
 		ShutdownTimeout: 15 * time.Second,
 		APIURL:          "http://localhost:8081",
-		// the backend's defaults allow 10s fetch + 10s link budget = 20s, plus headroom
+		// backend worst case: 10s fetch + 10s link budget
 		APITimeout: 30 * time.Second,
 	}
 }
 
-// LoadWeb reads the frontend's settings with getenv (usually os.Getenv), using DefaultWeb for unset or empty variables and reporting every invalid one.
+// LoadWeb reads the frontend's settings from the environment.
 func LoadWeb(getenv func(string) string) (WebConfig, error) {
 	cfg := DefaultWeb()
 	l := loader{getenv: getenv}
@@ -49,7 +49,6 @@ func LoadWeb(getenv func(string) string) (WebConfig, error) {
 	return cfg, nil
 }
 
-// baseURL accepts an absolute http(s) URL with a host, the same rule the backend client applies.
 func (l *loader) baseURL(key string, dst *string) {
 	if v := l.getenv(key); v != "" {
 		u, err := url.Parse(v)

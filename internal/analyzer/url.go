@@ -7,10 +7,9 @@ import (
 	"strings"
 )
 
-// ErrInvalidURL is returned when the input is not an absolute http or https URL.
+// ErrInvalidURL is returned for input that is not an http(s) URL.
 var ErrInvalidURL = errors.New("invalid URL")
 
-// parseURL validates the user's input and returns it with a lowercase host and no fragment.
 func parseURL(raw string) (*url.URL, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

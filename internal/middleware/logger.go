@@ -7,10 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// healthPath is polled by the load balancer every few seconds, so it is logged at debug level only.
 const healthPath = "/healthz"
 
-// Logger logs one line per request with any errors recorded through c.Error; 5xx logs as error, 4xx as warn, the rest as info.
+// Logger logs one line per request.
 func Logger(log *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -20,10 +19,10 @@ func Logger(log *slog.Logger) gin.HandlerFunc {
 		attrs := []slog.Attr{
 			slog.String("request_id", RequestIDFrom(c.Request.Context())),
 			slog.String("method", c.Request.Method),
-			slog.String("path", c.Request.URL.Path), // query strings are left out; no route uses them
+			slog.String("path", c.Request.URL.Path),
 			slog.Int("status", status),
 			slog.Float64("duration_ms", float64(time.Since(start).Microseconds())/1000),
-			slog.Int("bytes", max(c.Writer.Size(), 0)), // -1 when nothing was written
+			slog.Int("bytes", max(c.Writer.Size(), 0)), // Size is -1 before a write
 			slog.String("client_ip", c.ClientIP()),
 		}
 		if len(c.Errors) > 0 {

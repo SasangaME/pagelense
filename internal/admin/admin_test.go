@@ -17,7 +17,7 @@ func TestHandler(t *testing.T) {
 	tests := []struct {
 		method, path string
 		want         int
-		body         string // substring of the body; "" skips the check
+		body         string
 	}{
 		{http.MethodGet, "/metrics", http.StatusOK, "test_total 0"},
 		{http.MethodGet, "/debug/pprof/", http.StatusOK, "goroutine"},
@@ -54,7 +54,6 @@ func TestNewServer(t *testing.T) {
 	if srv.Addr != ":9091" {
 		t.Errorf("Addr = %q, want :9091", srv.Addr)
 	}
-	// a 30s CPU profile, pprof's default, must fit in the write timeout
 	if srv.WriteTimeout <= 30e9 {
 		t.Errorf("WriteTimeout = %v, want more than 30s", srv.WriteTimeout)
 	}

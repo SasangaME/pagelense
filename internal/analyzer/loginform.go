@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// isLoginField reports whether n is a password input or an autocomplete="username" input (identifier-first sign-in), even outside a <form>, as script-driven pages like Google's use.
+// autocomplete="username" catches sign-in pages that ask for the password on a later step.
 func isLoginField(n *html.Node) bool {
 	if n.Type != html.ElementNode || n.DataAtom != atom.Input {
 		return false

@@ -1,4 +1,4 @@
-// Package api serves the backend JSON API that analyzes web pages.
+// Package api serves the backend JSON API.
 package api
 
 import (
@@ -13,22 +13,20 @@ import (
 	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
-// Analyzer analyzes a web page. *analyzer.Analyzer implements it.
+// Analyzer analyzes a web page.
 type Analyzer interface {
 	Analyze(ctx context.Context, rawURL string) (analyzer.Result, error)
 }
 
-// server holds the dependencies shared by the handlers.
 type server struct {
 	analyzer Analyzer
 }
 
-// New returns the backend's HTTP handler with request IDs, logging and recovery; extra middleware, such as metrics, runs first.
+// New returns the backend's HTTP handler; extra middleware runs first.
 func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
 	s := &server{analyzer: a}
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
-	// nil means X-Forwarded-For is ignored and ClientIP is the TCP peer
 	if err := r.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}

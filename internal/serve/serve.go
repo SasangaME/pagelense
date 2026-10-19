@@ -1,4 +1,4 @@
-// Package serve runs a service's HTTP servers and shuts them down gracefully.
+// Package serve runs HTTP servers and shuts them down gracefully.
 package serve
 
 import (
@@ -12,15 +12,15 @@ import (
 	"time"
 )
 
-// Server is an HTTP server with a name for the logs, such as "api" or "admin".
+// Server is an HTTP server with a name for the logs.
 type Server struct {
 	Name string
 	*http.Server
 }
 
-// Run serves every server until ctx is done or one fails, then shuts all down, giving in-flight requests up to timeout; it returns nil after a clean shutdown on ctx.
+// Run serves until ctx is done or a server fails, then shuts all of them down.
 func Run(ctx context.Context, log *slog.Logger, timeout time.Duration, servers ...Server) error {
-	// listen first, so a port already in use stops startup before anything is served
+	// listen first, so a port in use stops startup
 	var lc net.ListenConfig
 	listeners := make([]net.Listener, 0, len(servers))
 	for _, s := range servers {
@@ -36,9 +36,7 @@ func Run(ctx context.Context, log *slog.Logger, timeout time.Duration, servers .
 	return serve(ctx, log, timeout, servers, listeners)
 }
 
-// serve runs each server on its listener until ctx is done or one fails, then shuts them all down.
 func serve(ctx context.Context, log *slog.Logger, timeout time.Duration, servers []Server, listeners []net.Listener) error {
-	// buffered, so a server failing after shutdown has started never blocks its goroutine
 	errc := make(chan error, len(servers))
 	for i, s := range servers {
 		log.Info(s.Name+" listening", "addr", listeners[i].Addr().String())
@@ -59,9 +57,8 @@ func serve(ctx context.Context, log *slog.Logger, timeout time.Duration, servers
 	return errors.Join(serveErr, shutdown(ctx, log, timeout, servers))
 }
 
-// shutdown stops every server at once, so they share one timeout rather than adding theirs up.
 func shutdown(ctx context.Context, log *slog.Logger, timeout time.Duration, servers []Server) error {
-	// ctx is usually canceled by now, so only its values carry over
+	// ctx is canceled by now
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
 
@@ -73,7 +70,6 @@ func shutdown(ctx context.Context, log *slog.Logger, timeout time.Duration, serv
 			defer wg.Done()
 			start := time.Now()
 			if err := s.Shutdown(ctx); err != nil {
-				// requests still running are cut off; their contexts are canceled with the connection
 				_ = s.Close()
 				errs[i] = fmt.Errorf("%s server: shutdown: %w", s.Name, err)
 				return

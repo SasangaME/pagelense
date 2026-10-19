@@ -16,13 +16,11 @@ import (
 	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
-// analyzePath is the backend endpoint, relative to API_URL.
 const analyzePath = "/api/v1/analyze"
 
-// maxResponseBytes caps a backend response; a result or error body is a few hundred bytes.
 const maxResponseBytes = 1 << 20
 
-// APIError is returned when the backend answers with an error or cannot be reached. Message is user-safe; Err is the cause.
+// APIError is returned when the backend fails. Message is safe to show users.
 type APIError struct {
 	Status  int
 	Message string
@@ -38,13 +36,13 @@ func (e *APIError) Error() string {
 
 func (e *APIError) Unwrap() error { return e.Err }
 
-// Client calls the backend's JSON API. It implements Analyzer.
+// Client calls the backend's JSON API.
 type Client struct {
 	http     *http.Client
 	endpoint string
 }
 
-// NewClient returns a client for the backend at baseURL; timeout bounds each call, so it must outlast the backend's fetch plus link checks.
+// NewClient returns a client for the backend at baseURL.
 func NewClient(baseURL string, timeout time.Duration) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
@@ -63,14 +61,13 @@ type analyzeRequest struct {
 	URL string `json:"url"`
 }
 
-// errorBody matches the backend's error JSON; internal/api's contract test keeps the field names fixed.
 type errorBody struct {
 	Error struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
 
-// Analyze asks the backend to analyze rawURL; backend errors keep their status, unreachable gives 502, no answer in time 504.
+// Analyze asks the backend to analyze rawURL.
 func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, error) {
 	body, err := json.Marshal(analyzeRequest{URL: rawURL})
 	if err != nil {
@@ -107,7 +104,6 @@ func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, e
 	return res, nil
 }
 
-// statusError turns a non-200 backend response into an APIError; a body that is not the API's error JSON gives 502.
 func statusError(status int, data []byte) *APIError {
 	var eb errorBody
 	if err := json.Unmarshal(data, &eb); err != nil || eb.Error.Message == "" || status < 400 || status > 599 {
@@ -120,7 +116,6 @@ func statusError(status int, data []byte) *APIError {
 	return &APIError{Status: status, Message: eb.Error.Message}
 }
 
-// transportError maps a failed call to an APIError; context.Canceled passes through, like in the fetcher.
 func transportError(err error) error {
 	if errors.Is(err, context.Canceled) {
 		return err

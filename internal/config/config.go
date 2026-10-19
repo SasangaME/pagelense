@@ -9,20 +9,20 @@ import (
 	"time"
 )
 
-// Config holds the application settings. The zero value is not valid; use Load.
+// Config holds the backend's settings.
 type Config struct {
-	Port            int           // PORT: public app server
-	AdminPort       int           // ADMIN_PORT: /metrics and /debug/pprof, never exposed publicly
-	LogLevel        slog.Level    // LOG_LEVEL: debug, info, warn or error
-	FetchTimeout    time.Duration // FETCH_TIMEOUT: whole page fetch, including redirects and body
-	LinkTimeout     time.Duration // LINK_TIMEOUT: per checked link
-	LinkBudget      time.Duration // LINK_BUDGET: all link checks of one analysis; links not finished in time are not counted
-	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: how long in-flight requests get to finish on Ctrl+C or SIGTERM
-	LinkWorkers     int           // LINK_WORKERS: concurrent link checks per analysis
-	MaxLinks        int           // MAX_LINKS: unique links checked per analysis
+	Port            int           // PORT
+	AdminPort       int           // ADMIN_PORT
+	LogLevel        slog.Level    // LOG_LEVEL
+	FetchTimeout    time.Duration // FETCH_TIMEOUT
+	LinkTimeout     time.Duration // LINK_TIMEOUT
+	LinkBudget      time.Duration // LINK_BUDGET
+	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT
+	LinkWorkers     int           // LINK_WORKERS
+	MaxLinks        int           // MAX_LINKS
 }
 
-// Default returns the settings used for variables that are unset or empty.
+// Default returns the backend defaults.
 func Default() Config {
 	return Config{
 		Port:            8080,
@@ -37,7 +37,7 @@ func Default() Config {
 	}
 }
 
-// Load reads the backend's settings with getenv (usually os.Getenv), using Default for unset or empty variables and reporting every invalid one.
+// Load reads the backend's settings from the environment.
 func Load(getenv func(string) string) (Config, error) {
 	cfg := Default()
 	l := loader{getenv: getenv}
@@ -59,7 +59,7 @@ func Load(getenv func(string) string) (Config, error) {
 	return cfg, nil
 }
 
-// loader reads variables into settings and collects every invalid one, so a bad config is reported in one go.
+// loader collects every invalid variable so they are reported together.
 type loader struct {
 	getenv func(string) string
 	errs   []error

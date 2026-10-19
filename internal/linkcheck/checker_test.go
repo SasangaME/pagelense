@@ -16,7 +16,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/fetcher"
 )
 
-// distinctURLs returns n different URLs on base, so deduplication does not merge them.
 func distinctURLs(base string, n int) []string {
 	urls := make([]string, n)
 	for i := range urls {
@@ -129,7 +128,7 @@ func TestCheckNoURLs(t *testing.T) {
 func TestCheckNetworkError(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	url := srv.URL
-	srv.Close() // nothing listens on the port any more
+	srv.Close()
 
 	results := New(http.DefaultClient, Options{Workers: 1}).Check(context.Background(), []string{url})
 	if len(results) != 1 {
@@ -143,7 +142,6 @@ func TestCheckNetworkError(t *testing.T) {
 func TestCheckWorkerCount(t *testing.T) {
 	const workers = 3
 	var inFlight, peak atomic.Int32
-	// every request waits until `workers` requests are running at once
 	release := make(chan struct{})
 	var once sync.Once
 
@@ -202,7 +200,6 @@ func TestCheckCanceled(t *testing.T) {
 	}
 }
 
-// blockUntilDone holds each request open until the client gives up or the test times out.
 func blockUntilDone(_ http.ResponseWriter, r *http.Request) {
 	select {
 	case <-r.Context().Done():
@@ -234,7 +231,6 @@ func TestCheckTimeoutIsPerLink(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// one worker checks the links one after another: 15 × 20ms = 300ms in total, beyond the timeout
 	urls := distinctURLs(srv.URL, 15)
 	results := New(srv.Client(), Options{Workers: 1, Timeout: 200 * time.Millisecond}).
 		Check(context.Background(), urls)
@@ -282,7 +278,6 @@ func TestCheckBudget(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// the fast link finishes; the slow one is still in flight and the rest are never sent when the budget runs out
 	urls := append([]string{srv.URL + "/fast", srv.URL + "/slow"}, distinctURLs(srv.URL+"/queued", 5)...)
 	start := time.Now()
 	results := New(srv.Client(), Options{Workers: 1, Budget: 100 * time.Millisecond}).
@@ -299,7 +294,6 @@ func TestCheckBudgetKeepsLinkTimeouts(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(blockUntilDone))
 	defer srv.Close()
 
-	// the per-link timeout fires well within the budget, so the link counts as checked and inaccessible
 	results := New(srv.Client(), Options{Workers: 1, Timeout: 50 * time.Millisecond, Budget: time.Second}).
 		Check(context.Background(), []string{srv.URL})
 	if len(results) != 1 || !errors.Is(results[0].Err, context.DeadlineExceeded) {
@@ -319,7 +313,6 @@ func TestCheckUserAgent(t *testing.T) {
 			var got atomic.Value
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				got.Store(r.UserAgent())
-				// a 405 makes the checker retry with GET, which must carry the agent too
 				if r.Method == http.MethodHead {
 					w.WriteHeader(http.StatusMethodNotAllowed)
 				} else if r.UserAgent() != tt.want {
@@ -389,7 +382,6 @@ func TestCheckSharesFetcherClient(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// AllowPrivateIPs is false, so the fetcher's dialer refuses the loopback test server
 	f := fetcher.New(fetcher.Options{Timeout: time.Second, MaxRedirects: 3, MaxBodyBytes: 1024})
 	results := New(f.Client(), Options{Workers: 1}).Check(context.Background(), []string{srv.URL})
 

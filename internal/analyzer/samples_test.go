@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// TestSamples runs the parsing steps over the pages in testdata and checks everything a Result is built from.
 func TestSamples(t *testing.T) {
 	tests := []struct {
 		file         string
@@ -21,7 +20,6 @@ func TestSamples(t *testing.T) {
 		wantLogin    bool
 	}{
 		{
-			// <base href> points at the CDN, so every relative link resolves there and is external.
 			file:         "html5_page.html",
 			pageURL:      "https://example.com/store",
 			wantVersion:  "HTML5",

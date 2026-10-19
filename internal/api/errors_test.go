@@ -11,7 +11,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/fetcher"
 )
 
-// fetchErr wraps a FetchError the way the analyzer does.
 func fetchErr(code int, msg string) error {
 	return fmt.Errorf("fetch page: %w", &fetcher.FetchError{StatusCode: code, Message: msg, Err: errors.New("cause")})
 }

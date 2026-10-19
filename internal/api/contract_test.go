@@ -17,7 +17,6 @@ import (
 	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
-// assertJSON compares JSON documents by value, so key order and spacing don't matter but every field name does.
 func assertJSON(t *testing.T, got []byte, want string) {
 	t.Helper()
 	var g, w any
@@ -32,7 +31,6 @@ func assertJSON(t *testing.T, got []byte, want string) {
 	}
 }
 
-// The frontend decodes these bodies, so the field names are a contract: these tests fail if a json tag changes.
 func TestContractSuccessJSON(t *testing.T) {
 	fake := &fakeAnalyzer{result: analyzer.Result{
 		URL:          "https://example.com/home",
@@ -71,7 +69,6 @@ func TestAnalyzerGetsRequestContext(t *testing.T) {
 	w := httptest.NewRecorder()
 	newAPIHandler(t, fake).ServeHTTP(w, req)
 
-	// the ID the frontend forwards reaches the analyzer and comes back, so logs from both services line up
 	if fake.gotRequestID != "from-frontend-1" {
 		t.Errorf("analyzer saw request ID %q, want the incoming one", fake.gotRequestID)
 	}
@@ -102,7 +99,7 @@ func TestRequestIDOnEveryResponse(t *testing.T) {
 
 func TestCanceledRequestReachesAnalyzer(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	cancel() // the client has gone away
+	cancel()
 	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/analyze", strings.NewReader(`{"url": "https://example.com"}`))
 	w := httptest.NewRecorder()
 	newAPIHandler(t, &fakeAnalyzer{}).ServeHTTP(w, req)

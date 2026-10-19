@@ -1,4 +1,4 @@
-// Package analyzer fetches a web page and reports its HTML version, title, headings, links and login form.
+// Package analyzer fetches a web page and reports what it contains.
 package analyzer
 
 import (
@@ -11,28 +11,28 @@ import (
 	"github.com/SasangaME/pagelense/internal/linkcheck"
 )
 
-// Fetcher downloads a page. *fetcher.Fetcher implements it.
+// Fetcher downloads a page.
 type Fetcher interface {
 	Fetch(ctx context.Context, rawURL string) (*fetcher.Page, error)
 }
 
-// LinkChecker checks whether links are reachable. *linkcheck.Checker implements it.
+// LinkChecker checks whether links are reachable.
 type LinkChecker interface {
 	Check(ctx context.Context, urls []string) []linkcheck.Result
 }
 
-// Analyzer analyzes web pages. It is safe for concurrent use if its Fetcher and LinkChecker are.
+// Analyzer analyzes web pages.
 type Analyzer struct {
 	fetcher Fetcher
 	checker LinkChecker
 }
 
-// New returns an Analyzer that downloads pages with f and checks their links with c.
+// New returns an Analyzer.
 func New(f Fetcher, c LinkChecker) *Analyzer {
 	return &Analyzer{fetcher: f, checker: c}
 }
 
-// Analyze validates rawURL, fetches the page, parses it and checks its links.
+// Analyze fetches rawURL, parses the page and checks its links.
 func (a *Analyzer) Analyze(ctx context.Context, rawURL string) (Result, error) {
 	u, err := parseURL(rawURL)
 	if err != nil {
@@ -49,12 +49,11 @@ func (a *Analyzer) Analyze(ctx context.Context, rawURL string) (Result, error) {
 		return Result{}, err
 	}
 
-	// links resolve against the final URL, since redirects can change the host or path
 	l := classifyLinks(pg.URL, p.baseHref, p.hrefs)
 	all := slices.Concat(l.internal, l.external)
 
 	checked, inaccessible := countChecked(all, a.checker.Check(ctx, all))
-	// on cancellation the results are partial and canceled checks look inaccessible, so report the error instead
+	// canceled checks look inaccessible, so don't report partial counts
 	if err := ctx.Err(); err != nil {
 		return Result{}, fmt.Errorf("check links: %w", err)
 	}
@@ -74,7 +73,6 @@ func (a *Analyzer) Analyze(ctx context.Context, rawURL string) (Result, error) {
 	}, nil
 }
 
-// countChecked maps the per-URL results back to every link, skipping links over the checker's cap.
 func countChecked(links []string, results []linkcheck.Result) (checked, inaccessible int) {
 	accessible := make(map[string]bool, len(results))
 	for _, r := range results {

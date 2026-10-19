@@ -1,4 +1,4 @@
-// Package middleware provides the Gin middleware shared by the backend and frontend: request IDs, request logging and panic recovery.
+// Package middleware has the Gin middleware both services use.
 package middleware
 
 import (
@@ -8,15 +8,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HeaderRequestID carries the request ID between clients, the frontend and the backend.
+// HeaderRequestID is the request ID header.
 const HeaderRequestID = "X-Request-ID"
 
-// maxRequestIDLen bounds an incoming ID, so a client cannot fill the logs with a huge header.
 const maxRequestIDLen = 128
 
 type requestIDKey struct{}
 
-// RequestID reuses a valid incoming X-Request-ID or generates one, echoes it, and stores it in the request context.
+// RequestID reuses a valid incoming X-Request-ID or generates one.
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader(HeaderRequestID)
@@ -29,18 +28,17 @@ func RequestID() gin.HandlerFunc {
 	}
 }
 
-// WithRequestID returns a copy of ctx carrying the request ID; RequestID uses it, and so can tests and non-Gin callers.
+// WithRequestID returns a copy of ctx carrying id.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, requestIDKey{}, id)
 }
 
-// RequestIDFrom returns the request ID stored by RequestID, or "" if there is none.
+// RequestIDFrom returns the request ID in ctx, or "".
 func RequestIDFrom(ctx context.Context) string {
 	id, _ := ctx.Value(requestIDKey{}).(string)
 	return id
 }
 
-// validRequestID accepts short IDs made of letters, digits and -_.: (UUIDs, ALB trace IDs and our own IDs all fit).
 func validRequestID(id string) bool {
 	if id == "" || len(id) > maxRequestIDLen {
 		return false

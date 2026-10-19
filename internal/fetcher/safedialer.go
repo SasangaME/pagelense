@@ -10,20 +10,19 @@ import (
 	"time"
 )
 
-// ErrBlockedAddress is returned when a host resolves to an address that must not be fetched.
+// ErrBlockedAddress is returned when a host resolves to a non-public IP.
 var ErrBlockedAddress = errors.New("address not allowed")
 
-// blockedPrefixes are special-purpose ranges not covered by the netip.Addr helpers.
+// ranges the netip.Addr helpers do not cover
 var blockedPrefixes = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),     // "this network"
-	netip.MustParsePrefix("100.64.0.0/10"), // carrier-grade NAT, also used for cloud metadata
-	netip.MustParsePrefix("192.0.0.0/24"),  // IETF protocol assignments
-	netip.MustParsePrefix("198.18.0.0/15"), // benchmarking
-	netip.MustParsePrefix("240.0.0.0/4"),   // reserved, includes broadcast
-	netip.MustParsePrefix("64:ff9b::/96"),  // NAT64, can map to private IPv4
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"), // CGNAT
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("64:ff9b::/96"), // NAT64
 }
 
-// isBlocked reports whether ip is private, loopback, link-local (incl. metadata 169.254.169.254) or otherwise non-public.
 func isBlocked(ip netip.Addr) bool {
 	ip = ip.Unmap()
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
@@ -38,7 +37,7 @@ func isBlocked(ip netip.Addr) bool {
 	return false
 }
 
-// safeControl rejects connections to blocked IPs after DNS resolution, so redirects and DNS rebinding are checked too.
+// safeControl runs after DNS resolution, so redirects and DNS rebinding are covered too.
 func safeControl(_, address string, _ syscall.RawConn) error {
 	ap, err := netip.ParseAddrPort(address)
 	if err != nil {
@@ -50,18 +49,17 @@ func safeControl(_, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// newTransport returns an HTTP transport that dials only public IPs unless allowPrivate is set.
 func newTransport(allowPrivate bool) *http.Transport {
 	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	if !allowPrivate {
 		dialer.Control = safeControl
 	}
-	// Proxy stays nil: a proxy would dial on our behalf and bypass the check.
+	// no Proxy: it would dial for us and skip the check
 	return &http.Transport{
 		DialContext:       dialer.DialContext,
 		ForceAttemptHTTP2: true,
 		MaxIdleConns:      100,
-		// most link checks go to the page's own host; Go's default of 2 would redial (and redo TLS) for every extra worker
+		// most link checks go to the page's own host
 		MaxIdleConnsPerHost:   100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,

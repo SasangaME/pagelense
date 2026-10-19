@@ -41,7 +41,6 @@ func TestLoginFieldDetection(t *testing.T) {
 		{name: "autocomplete token is not a substring match", html: `<form><input autocomplete="nickname"></form>`, want: false},
 		{name: "password outside any form", html: `<div><input type="password"></div>`, want: true},
 		{
-			// Google's sign-in page has no <form>; script submits the fields.
 			name: "formless identifier-first step",
 			html: `<div><input type="text" name="identifier" autocomplete="username webauthn"><div role="button">Next</div></div>`,
 			want: true,
