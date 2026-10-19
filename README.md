@@ -7,8 +7,6 @@ It's two small Go services:
 - **web** on http://localhost:8080 – the HTML pages
 - **api** on http://localhost:8081 – the JSON API that does the work
 
-More detail in [docs/architecture.md](docs/architecture.md) (diagram and request flow), [docs/api.md](docs/api.md) (endpoints and errors) and [docs/testing.md](docs/testing.md) (test results, coverage and manual tests).
-
 ## Tech stack
 
 - **Backend:** Go 1.27, Gin, `golang.org/x/net/html` for parsing, `log/slog` for JSON logs
@@ -40,7 +38,29 @@ make cover   # fails under 70%
 make lint
 ```
 
-Latest run: all tests pass with `-race`, 90.7% coverage, 0 lint issues. See [docs/testing.md](docs/testing.md).
+## Architecture
+
+![pagelense architecture](docs/architecture.png)
+
+The services, packages and request flow are in **[docs/architecture.md](docs/architecture.md)**.
+
+## API
+
+```sh
+curl -X POST http://localhost:8081/api/v1/analyze \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com"}'
+```
+
+Endpoints, the response format and every error status are in **[docs/api.md](docs/api.md)**.
+
+## Testing
+
+- All tests pass with `-race`
+- 90.7% coverage (`make cover` fails under 70%)
+- 0 lint issues
+
+The per-package results, manual test cases with screenshots and API tests with Bruno are in **[docs/testing.md](docs/testing.md)**.
 
 ## How it works
 
