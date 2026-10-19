@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -26,26 +25,53 @@ func distinctURLs(base string, n int) []string {
 	return urls
 }
 
-func TestCheckAllURLs(t *testing.T) {
+func TestCheckStatuses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/missing" {
+		switch r.URL.Path {
+		case "/missing":
 			w.WriteHeader(http.StatusNotFound)
+		case "/error":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/moved":
+			http.Redirect(w, r, "/ok", http.StatusMovedPermanently)
 		}
 	}))
 	defer srv.Close()
 
-	urls := []string{srv.URL + "/a", srv.URL + "/b", srv.URL + "/missing", srv.URL + "/c"}
+	tests := []struct {
+		path       string
+		wantStatus int
+		wantOK     bool
+	}{
+		{"/ok", http.StatusOK, true},
+		{"/moved", http.StatusOK, true}, // redirects are followed
+		{"/missing", http.StatusNotFound, false},
+		{"/error", http.StatusInternalServerError, false},
+	}
+	urls := make([]string, len(tests))
+	for i, tt := range tests {
+		urls[i] = srv.URL + tt.path
+	}
 	results := New(srv.Client(), Options{Workers: 2}).Check(context.Background(), urls)
 
 	if len(results) != len(urls) {
 		t.Fatalf("got %d results, want %d", len(results), len(urls))
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].URL < results[j].URL })
+	byURL := make(map[string]Result, len(results))
 	for _, r := range results {
-		wantOK := r.URL != srv.URL+"/missing"
-		if r.Accessible() != wantOK {
-			t.Errorf("%s: Accessible() = %v, want %v (status %d, err %v)", r.URL, r.Accessible(), wantOK, r.StatusCode, r.Err)
-		}
+		byURL[r.URL] = r
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			r, ok := byURL[srv.URL+tt.path]
+			if !ok {
+				t.Fatal("no result")
+			}
+			if r.StatusCode != tt.wantStatus || r.Accessible() != tt.wantOK || r.Err != nil {
+				t.Errorf("got status %d, accessible %v, err %v; want status %d, accessible %v",
+					r.StatusCode, r.Accessible(), r.Err, tt.wantStatus, tt.wantOK)
+			}
+		})
 	}
 }
 
