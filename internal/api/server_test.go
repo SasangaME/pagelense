@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,9 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/SasangaME/pagelense/internal/analyzer"
+	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
 var _ Analyzer = (*analyzer.Analyzer)(nil)
+
+var discardLogger = slog.New(slog.DiscardHandler)
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
@@ -20,21 +24,27 @@ func TestMain(m *testing.M) {
 }
 
 type fakeAnalyzer struct {
-	result analyzer.Result
-	err    error
-	gotURL string
-	called bool
+	result       analyzer.Result
+	err          error
+	gotURL       string
+	gotRequestID string
+	called       bool
 }
 
-func (f *fakeAnalyzer) Analyze(_ context.Context, rawURL string) (analyzer.Result, error) {
+// Analyze records its inputs and, like the real analyzer, returns the context error once the request is canceled.
+func (f *fakeAnalyzer) Analyze(ctx context.Context, rawURL string) (analyzer.Result, error) {
 	f.called = true
 	f.gotURL = rawURL
+	f.gotRequestID = middleware.RequestIDFrom(ctx)
+	if err := ctx.Err(); err != nil {
+		return analyzer.Result{}, err
+	}
 	return f.result, f.err
 }
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	h, err := New(&fakeAnalyzer{})
+	h, err := New(&fakeAnalyzer{}, discardLogger)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -77,5 +87,19 @@ func TestRoutesRegistered(t *testing.T) {
 		if code == http.StatusNotFound || code == http.StatusMethodNotAllowed {
 			t.Errorf("%s %s: status %d, route not registered", route.method, route.path, code)
 		}
+	}
+}
+
+type panicAnalyzer struct{}
+
+func (panicAnalyzer) Analyze(context.Context, string) (analyzer.Result, error) {
+	panic("analyzer bug")
+}
+
+func TestPanicReturnsJSONError(t *testing.T) {
+	w := postJSON(newAPIHandler(t, panicAnalyzer{}), `{"url": "https://example.com"}`)
+	decodeError(t, w, http.StatusInternalServerError)
+	if w.Header().Get(middleware.HeaderRequestID) == "" {
+		t.Error("no request ID on the panic response")
 	}
 }

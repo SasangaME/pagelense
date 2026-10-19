@@ -11,8 +11,7 @@ type links struct {
 	external []string
 }
 
-// classifyLinks resolves each href against the page URL, or against the <base href> when it is valid,
-// and splits the results into internal and external links by comparing hosts with the page URL.
+// classifyLinks resolves each href against the page URL (or a valid <base href>) and splits them into internal and external by host.
 func classifyLinks(pageURL *url.URL, baseHref string, hrefs []string) links {
 	base := pageURL
 	if u, ok := resolveLink(pageURL, baseHref); ok {
@@ -35,9 +34,7 @@ func classifyLinks(pageURL *url.URL, baseHref string, hrefs []string) links {
 	return l
 }
 
-// resolveLink returns href as an absolute http or https URL with a lowercase host and no fragment.
-// Empty and fragment-only hrefs point back to the same page and are skipped, as are
-// mailto:, tel:, javascript: and any other scheme that is not http or https.
+// resolveLink returns href as an absolute http(s) URL with a lowercase host and no fragment; empty, fragment-only and non-http(s) hrefs are skipped.
 func resolveLink(base *url.URL, href string) (*url.URL, bool) {
 	href = strings.TrimSpace(href)
 	if href == "" || strings.HasPrefix(href, "#") {

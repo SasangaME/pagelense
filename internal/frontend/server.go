@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
 
 	"github.com/SasangaME/pagelense/internal/analyzer"
+	"github.com/SasangaME/pagelense/internal/middleware"
 	"github.com/SasangaME/pagelense/web"
 )
 
@@ -25,13 +27,13 @@ type Server struct {
 	analyzer Analyzer
 }
 
-// New returns the frontend's HTTP handler: web pages, health check and static files.
-func New(a Analyzer) (http.Handler, error) {
-	return newHandler(a, web.FS)
+// New returns the frontend's HTTP handler: web pages, health check and static files, with request IDs, logging and recovery.
+func New(a Analyzer, log *slog.Logger) (http.Handler, error) {
+	return newHandler(a, web.FS, log)
 }
 
 // newHandler builds the handler from the templates and static files in fsys, so tests can use their own templates.
-func newHandler(a Analyzer, fsys fs.FS) (http.Handler, error) {
+func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) {
 	pages, err := parsePages(fsys)
 	if err != nil {
 		return nil, err
@@ -49,6 +51,17 @@ func newHandler(a Analyzer, fsys fs.FS) (http.Handler, error) {
 	if err := r.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
+	r.Use(
+		middleware.RequestID(),
+		middleware.Logger(log),
+		middleware.Recovery(log, func(c *gin.Context) {
+			c.HTML(http.StatusInternalServerError, "error", pageData{
+				URL:    c.PostForm("url"),
+				Status: http.StatusInternalServerError,
+				Error:  "Something went wrong. Please try again.",
+			})
+		}),
+	)
 
 	r.GET("/", s.handleIndex)
 	r.POST("/analyze", s.handleAnalyze)

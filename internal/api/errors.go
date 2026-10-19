@@ -30,8 +30,7 @@ func errorResponse(err error) (int, string) {
 	}
 }
 
-// fetchStatus passes on an upstream error status, so a page that returns 404 is reported as 404.
-// Any other code (e.g. a 304 with no redirect to follow) becomes 502; the message still names the upstream code.
+// fetchStatus passes on an upstream 4xx/5xx status; any other code (e.g. 304) becomes 502, and the message still names it.
 func fetchStatus(code int) int {
 	if code >= 400 && code <= 599 {
 		return code

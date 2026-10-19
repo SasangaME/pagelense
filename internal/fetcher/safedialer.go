@@ -23,8 +23,7 @@ var blockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("64:ff9b::/96"),  // NAT64, can map to private IPv4
 }
 
-// isBlocked reports whether ip is private, loopback, link-local or otherwise non-public.
-// Link-local covers the cloud metadata endpoint 169.254.169.254.
+// isBlocked reports whether ip is private, loopback, link-local (incl. metadata 169.254.169.254) or otherwise non-public.
 func isBlocked(ip netip.Addr) bool {
 	ip = ip.Unmap()
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
@@ -39,8 +38,7 @@ func isBlocked(ip netip.Addr) bool {
 	return false
 }
 
-// safeControl rejects connections to blocked IPs. It runs after DNS resolution,
-// so redirects and DNS rebinding are checked too.
+// safeControl rejects connections to blocked IPs after DNS resolution, so redirects and DNS rebinding are checked too.
 func safeControl(_, address string, _ syscall.RawConn) error {
 	ap, err := netip.ParseAddrPort(address)
 	if err != nil {

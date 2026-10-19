@@ -4,11 +4,13 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/SasangaME/pagelense/internal/analyzer"
+	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
 // Analyzer analyzes a web page. *analyzer.Analyzer implements it.
@@ -21,8 +23,8 @@ type Server struct {
 	analyzer Analyzer
 }
 
-// New returns the backend's HTTP handler: the analyze endpoint and health check.
-func New(a Analyzer) (http.Handler, error) {
+// New returns the backend's HTTP handler: the analyze endpoint and health check, with request IDs, logging and recovery.
+func New(a Analyzer, log *slog.Logger) (http.Handler, error) {
 	s := &Server{analyzer: a}
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
@@ -30,6 +32,13 @@ func New(a Analyzer) (http.Handler, error) {
 	if err := r.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
+	r.Use(
+		middleware.RequestID(),
+		middleware.Logger(log),
+		middleware.Recovery(log, func(c *gin.Context) {
+			writeErrorBody(c, http.StatusInternalServerError, "Something went wrong while analyzing the page.")
+		}),
+	)
 
 	r.POST("/api/v1/analyze", s.handleAnalyze)
 	r.GET("/healthz", s.handleHealth)

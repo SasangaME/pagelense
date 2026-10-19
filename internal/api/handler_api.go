@@ -51,5 +51,9 @@ func (s *Server) handleAnalyze(c *gin.Context) {
 // writeError sends the error body and records err on the context, so the logging middleware can log the cause.
 func writeError(c *gin.Context, err error, status int, msg string) {
 	_ = c.Error(err)
+	writeErrorBody(c, status, msg)
+}
+
+func writeErrorBody(c *gin.Context, status int, msg string) {
 	c.JSON(status, errorBody{Error: errorDetail{Status: status, Message: msg}})
 }

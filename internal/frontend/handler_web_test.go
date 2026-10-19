@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,7 +27,7 @@ var testPages = fstest.MapFS{
 
 func newWebHandler(t *testing.T, a Analyzer) http.Handler {
 	t.Helper()
-	h, err := newHandler(a, testPages)
+	h, err := newHandler(a, testPages, discardLogger)
 	if err != nil {
 		t.Fatalf("newHandler: %v", err)
 	}
@@ -88,6 +89,24 @@ func TestAnalyzeErrorKeepsURL(t *testing.T) {
 	}
 	// the URL is HTML-escaped, so user input cannot inject markup
 	want := fmt.Sprintf("url=https://example.com/&lt;x&gt;|error|%d|%s", status, msg)
+	if got := w.Body.String(); got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+type panicAnalyzer struct{}
+
+func (panicAnalyzer) Analyze(context.Context, string) (analyzer.Result, error) {
+	panic("client bug")
+}
+
+func TestAnalyzePanicRendersErrorPage(t *testing.T) {
+	w := postForm(newWebHandler(t, panicAnalyzer{}), "/analyze", url.Values{"url": {"https://example.com"}})
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	want := "url=https://example.com|error|500|Something went wrong. Please try again."
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}

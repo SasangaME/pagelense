@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/SasangaME/pagelense/internal/analyzer"
 	"github.com/SasangaME/pagelense/web"
 )
+
+var discardLogger = slog.New(slog.DiscardHandler)
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
@@ -33,7 +36,7 @@ func (f *fakeAnalyzer) Analyze(_ context.Context, rawURL string) (analyzer.Resul
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	h, err := New(&fakeAnalyzer{})
+	h, err := New(&fakeAnalyzer{}, discardLogger)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

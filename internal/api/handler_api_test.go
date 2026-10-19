@@ -21,7 +21,7 @@ func postJSON(h http.Handler, body string) *httptest.ResponseRecorder {
 
 func newAPIHandler(t *testing.T, a Analyzer) http.Handler {
 	t.Helper()
-	h, err := New(a)
+	h, err := New(a, discardLogger)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

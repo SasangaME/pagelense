@@ -13,8 +13,7 @@ func hasLoginForm(forms []*html.Node) bool {
 	return slices.ContainsFunc(forms, isLoginForm)
 }
 
-// isLoginForm reports whether the form has a password field, or a field marked
-// autocomplete="username", which identifier-first sign-in pages use for the step before the password.
+// isLoginForm reports whether the form has a password field, or an autocomplete="username" field as used by identifier-first sign-in.
 func isLoginForm(form *html.Node) bool {
 	for n := range form.Descendants() {
 		if n.Type != html.ElementNode || n.DataAtom != atom.Input {
