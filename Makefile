@@ -3,6 +3,12 @@ BIN_DIR := bin
 PKG     := ./cmd/pagelense
 COVER   := coverage.out
 
+# Load local settings from .env if it exists (see .env.example).
+ifneq (,$(wildcard .env))
+include .env
+export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .env)
+endif
+
 .PHONY: run build test cover lint clean
 
 run:
