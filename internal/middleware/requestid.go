@@ -24,9 +24,14 @@ func RequestID() gin.HandlerFunc {
 			id = rand.Text()
 		}
 		c.Header(HeaderRequestID, id)
-		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), requestIDKey{}, id))
+		c.Request = c.Request.WithContext(WithRequestID(c.Request.Context(), id))
 		c.Next()
 	}
+}
+
+// WithRequestID returns a copy of ctx carrying the request ID; RequestID uses it, and so can tests and non-Gin callers.
+func WithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, requestIDKey{}, id)
 }
 
 // RequestIDFrom returns the request ID stored by RequestID, or "" if there is none.

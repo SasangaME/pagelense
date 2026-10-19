@@ -13,15 +13,6 @@ coverage.html
 .env.*
 !.env.example
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-!*.tfvars.example
-crash.log
-.terraform.tfstate.lock.info
-
 # OS / editors
 .DS_Store
 .idea/
