@@ -7,8 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const healthPath = "/healthz"
-
 // Logger logs one line per request.
 func Logger(log *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -35,8 +33,6 @@ func Logger(log *slog.Logger) gin.HandlerFunc {
 			level = slog.LevelError
 		case status >= 400:
 			level = slog.LevelWarn
-		case c.Request.URL.Path == healthPath:
-			level = slog.LevelDebug
 		}
 		log.LogAttrs(c.Request.Context(), level, "request", attrs...)
 	}

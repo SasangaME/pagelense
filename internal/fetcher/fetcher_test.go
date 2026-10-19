@@ -202,8 +202,7 @@ func TestFetchContentType(t *testing.T) {
 		{name: "pdf", header: "application/pdf", wantErr: true},
 		{name: "xml", header: "application/xml", wantErr: true},
 		{name: "malformed", header: "text/html;;;=", wantErr: true},
-		{name: "missing, sniffed as html", body: "<!DOCTYPE html><title>x</title>"},
-		{name: "missing, sniffed as text", body: "just some text", wantErr: true},
+		{name: "missing", body: "<!DOCTYPE html><title>x</title>"},
 	}
 
 	for _, tt := range tests {

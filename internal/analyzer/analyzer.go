@@ -53,10 +53,6 @@ func (a *Analyzer) Analyze(ctx context.Context, rawURL string) (Result, error) {
 	all := slices.Concat(l.internal, l.external)
 
 	checked, inaccessible := countChecked(all, a.checker.Check(ctx, all))
-	// canceled checks look inaccessible, so don't report partial counts
-	if err := ctx.Err(); err != nil {
-		return Result{}, fmt.Errorf("check links: %w", err)
-	}
 
 	return Result{
 		URL:         pg.URL.String(),

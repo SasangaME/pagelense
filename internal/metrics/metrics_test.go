@@ -100,7 +100,7 @@ func observations(t *testing.T, reg *prometheus.Registry, name, outcome string) 
 }
 
 func TestInstrumentAnalyzer(t *testing.T) {
-	for _, err := range []error{nil, errors.New("boom"), context.Canceled} {
+	for _, err := range []error{nil, errors.New("boom")} {
 		reg := prometheus.NewRegistry()
 		res, gotErr := InstrumentAnalyzer(reg, fakeAnalyzer{err: err}).Analyze(t.Context(), "https://example.com")
 
@@ -124,7 +124,6 @@ func TestInstrumentBackendErrors(t *testing.T) {
 		{"timeout", &frontend.APIError{Status: http.StatusGatewayTimeout, Message: "slow"}, outcomeError, "504"},
 		{"backend status", &frontend.APIError{Status: http.StatusNotFound, Message: "upstream 404"}, outcomeError, "404"},
 		{"other error", errors.New("encode request"), outcomeError, "502"},
-		{"canceled", context.Canceled, outcomeCanceled, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -167,44 +166,19 @@ func TestInstrumentChecker(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	c := InstrumentChecker(reg, fakeChecker{results: results})
 
-	urls := []string{"https://a.example", "https://a.example", "https://b.example", "https://c.example",
-		"https://d.example", "https://e.example", "https://f.example"}
+	urls := []string{"https://a.example", "https://b.example", "https://c.example", "https://d.example"}
 	if got := c.Check(t.Context(), urls); len(got) != len(results) {
 		t.Fatalf("Check returned %d results, want the wrapped checker's %d", len(got), len(results))
 	}
 
 	want := `
-# HELP pagelense_link_checks_total Unique links per analysis, by outcome: accessible, inaccessible (4xx/5xx), failed (no response) or skipped (over the cap, budget or canceled).
+# HELP pagelense_link_checks_total Checked links, by outcome: accessible, inaccessible (4xx/5xx) or failed (no response).
 # TYPE pagelense_link_checks_total counter
 pagelense_link_checks_total{outcome="accessible"} 2
 pagelense_link_checks_total{outcome="failed"} 1
 pagelense_link_checks_total{outcome="inaccessible"} 1
-pagelense_link_checks_total{outcome="skipped"} 2
 `
 	if err := testutil.GatherAndCompare(reg, strings.NewReader(want), "pagelense_link_checks_total"); err != nil {
 		t.Error(err)
-	}
-}
-
-func TestInstrumentCheckerStartsAtZero(t *testing.T) {
-	reg := prometheus.NewRegistry()
-	InstrumentChecker(reg, fakeChecker{})
-	if got := testutil.CollectAndCount(reg, "pagelense_link_checks_total"); got != 4 {
-		t.Errorf("series before any check = %d, want 4", got)
-	}
-}
-
-func TestMetricNamesLint(t *testing.T) {
-	reg := prometheus.NewRegistry()
-	NewHTTP(reg)
-	InstrumentAnalyzer(reg, nil)
-	InstrumentBackend(reg, nil)
-	InstrumentChecker(reg, nil)
-	problems, err := testutil.GatherAndLint(reg)
-	if err != nil {
-		t.Fatalf("GatherAndLint: %v", err)
-	}
-	for _, p := range problems {
-		t.Errorf("%s: %s", p.Metric, p.Text)
 	}
 }

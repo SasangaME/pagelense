@@ -33,17 +33,11 @@ func (f *fakeFetcher) Fetch(_ context.Context, rawURL string) (*fetcher.Page, er
 type fakeChecker struct {
 	statuses map[string]int
 	limit    int
-	cancel   context.CancelFunc
 	gotURLs  []string
 }
 
 func (c *fakeChecker) Check(_ context.Context, urls []string) []linkcheck.Result {
 	c.gotURLs = urls
-	if c.cancel != nil {
-		c.cancel()
-		return []linkcheck.Result{{URL: urls[0], Err: context.Canceled}}
-	}
-
 	var out []linkcheck.Result
 	seen := make(map[string]bool)
 	for _, u := range urls {
@@ -196,16 +190,5 @@ func TestAnalyzeNoLinks(t *testing.T) {
 	}
 	if got.Links != (LinkStats{}) {
 		t.Errorf("links = %+v, want all zero", got.Links)
-	}
-}
-
-func TestAnalyzeCanceledDuringLinkCheck(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	f := &fakeFetcher{page: htmlPage(t, "https://example.com/", `<a href="/a">a</a><a href="/b">b</a>`)}
-
-	_, err := New(f, &fakeChecker{cancel: cancel}).Analyze(ctx, "https://example.com/")
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("err = %v, want context.Canceled instead of a partial result", err)
 	}
 }

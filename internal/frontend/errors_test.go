@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -29,10 +28,6 @@ func TestErrorResponse(t *testing.T) {
 			http.StatusGatewayTimeout, "analysis service took too long to respond"},
 		{"wrapped API error", fmt.Errorf("analyze: %w", &APIError{Status: http.StatusForbidden, Message: "localhost resolves to a private or reserved address"}),
 			http.StatusForbidden, "localhost resolves to a private or reserved address"},
-		{"API error with non-error status", &APIError{Status: http.StatusOK, Message: "ok"},
-			http.StatusBadGateway, "could not get a result from the analysis service"},
-		{"canceled", context.Canceled,
-			statusClientClosedRequest, "request was canceled"},
 		{"unexpected", errors.New("encode request: boom"),
 			http.StatusBadGateway, "could not get a result from the analysis service"},
 	}

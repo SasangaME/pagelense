@@ -59,11 +59,6 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go func() {
-		// a second Ctrl+C exits immediately
-		<-ctx.Done()
-		stop()
-	}()
 
 	log.Info("using backend", "api_url", cfg.APIURL)
 	return serve.Run(ctx, log, cfg.ShutdownTimeout,

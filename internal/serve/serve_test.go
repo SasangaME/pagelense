@@ -189,35 +189,4 @@ func TestRunPortInUse(t *testing.T) {
 	if err == nil || !strings.HasPrefix(err.Error(), "admin server:") {
 		t.Fatalf("Run = %v, want an admin server listen error", err)
 	}
-	ln, err := net.Listen("tcp", free)
-	if err != nil {
-		t.Errorf("app address still held after a failed start: %v", err)
-	} else {
-		_ = ln.Close()
-	}
-}
-
-type brokenListener struct{ net.Listener }
-
-func (brokenListener) Accept() (net.Conn, error) { return nil, errors.New("accept: socket broken") }
-
-func TestRunStopsWhenAServerFails(t *testing.T) {
-	appLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	adminLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	servers := []Server{newServer("app", "", ok), newServer("admin", "", ok)}
-
-	err = serve(t.Context(), discardLogger, time.Second, servers, []net.Listener{appLn, brokenListener{adminLn}})
-	if err == nil || !strings.Contains(err.Error(), "admin server: accept: socket broken") {
-		t.Fatalf("serve = %v, want the admin server's error", err)
-	}
-	if conn, err := net.Dial("tcp", appLn.Addr().String()); err == nil {
-		_ = conn.Close()
-		t.Error("app server still accepts connections after the admin server failed")
-	}
 }

@@ -11,15 +11,13 @@ import (
 // HeaderRequestID is the request ID header.
 const HeaderRequestID = "X-Request-ID"
 
-const maxRequestIDLen = 128
-
 type requestIDKey struct{}
 
-// RequestID reuses a valid incoming X-Request-ID or generates one.
+// RequestID reuses an incoming X-Request-ID or generates one.
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader(HeaderRequestID)
-		if !validRequestID(id) {
+		if id == "" {
 			id = rand.Text()
 		}
 		c.Header(HeaderRequestID, id)
@@ -37,18 +35,4 @@ func WithRequestID(ctx context.Context, id string) context.Context {
 func RequestIDFrom(ctx context.Context) string {
 	id, _ := ctx.Value(requestIDKey{}).(string)
 	return id
-}
-
-func validRequestID(id string) bool {
-	if id == "" || len(id) > maxRequestIDLen {
-		return false
-	}
-	for _, r := range id {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.', r == ':':
-		default:
-			return false
-		}
-	}
-	return true
 }

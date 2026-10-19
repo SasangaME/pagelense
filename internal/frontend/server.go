@@ -35,7 +35,6 @@ func (s *server) render(c *gin.Context, status int, name string, data pageData) 
 	if c.GetHeader(partialHeader) != "" {
 		block = "content"
 	}
-	c.Header("Vary", partialHeader)
 	c.Render(status, render.HTML{Template: s.pages[name], Name: block, Data: data})
 }
 

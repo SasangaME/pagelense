@@ -23,7 +23,7 @@ func TestHandler(t *testing.T) {
 		{http.MethodGet, "/debug/pprof/", http.StatusOK, "goroutine"},
 		{http.MethodGet, "/debug/pprof/goroutine?debug=1", http.StatusOK, "goroutine profile"},
 		{http.MethodGet, "/debug/pprof/cmdline", http.StatusOK, ""},
-		{http.MethodPost, "/debug/pprof/symbol", http.StatusOK, "num_symbols"},
+		{http.MethodGet, "/debug/pprof/symbol", http.StatusOK, "num_symbols"},
 		{http.MethodPost, "/metrics", http.StatusMethodNotAllowed, ""},
 		{http.MethodGet, "/", http.StatusNotFound, ""},
 	}

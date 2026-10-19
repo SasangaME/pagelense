@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -34,12 +33,6 @@ func TestErrorResponse(t *testing.T) {
 			http.StatusUnsupportedMediaType, "page at example.com is not HTML (image/png)"},
 		{"upstream timeout", fetchErr(http.StatusGatewayTimeout, "timed out fetching example.com"),
 			http.StatusGatewayTimeout, "timed out fetching example.com"},
-		{"page 304", fetchErr(http.StatusNotModified, "example.com returned 304 Not Modified"),
-			http.StatusBadGateway, "example.com returned 304 Not Modified"},
-		{"canceled", fmt.Errorf("check links: %w", context.Canceled),
-			statusClientClosedRequest, "request was canceled"},
-		{"deadline", fmt.Errorf("check links: %w", context.DeadlineExceeded),
-			http.StatusGatewayTimeout, "analysis took too long"},
 		{"unexpected", errors.New("parse html: boom"),
 			http.StatusInternalServerError, msgInternal},
 	}

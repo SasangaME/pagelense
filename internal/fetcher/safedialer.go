@@ -13,28 +13,9 @@ import (
 // ErrBlockedAddress is returned when a host resolves to a non-public IP.
 var ErrBlockedAddress = errors.New("address not allowed")
 
-// ranges the netip.Addr helpers do not cover
-var blockedPrefixes = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),
-	netip.MustParsePrefix("100.64.0.0/10"), // CGNAT
-	netip.MustParsePrefix("192.0.0.0/24"),
-	netip.MustParsePrefix("198.18.0.0/15"),
-	netip.MustParsePrefix("240.0.0.0/4"),
-	netip.MustParsePrefix("64:ff9b::/96"), // NAT64
-}
-
 func isBlocked(ip netip.Addr) bool {
 	ip = ip.Unmap()
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
-		return true
-	}
-	for _, p := range blockedPrefixes {
-		if p.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
 }
 
 // safeControl runs after DNS resolution, so redirects and DNS rebinding are covered too.

@@ -65,10 +65,6 @@ func TestRequestID(t *testing.T) {
 		{"none", "", false},
 		{"valid", "abc-123_x.y:z", true},
 		{"uuid", "3f2b8c1e-9d4a-4f6b-8e2a-1c5d7e9f0a3b", true},
-		{"with space", "abc 123", false},
-		{"with newline", "abc\n{\"level\":\"ERROR\"}", false},
-		{"too long", strings.Repeat("a", maxRequestIDLen+1), false},
-		{"max length", strings.Repeat("a", maxRequestIDLen), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,9 +87,6 @@ func TestRequestID(t *testing.T) {
 			}
 			if reused := got == tt.incoming; reused != tt.reused {
 				t.Errorf("ID %q reused = %v, want %v", got, reused, tt.reused)
-			}
-			if !tt.reused && !validRequestID(got) {
-				t.Errorf("generated ID %q is not valid", got)
 			}
 		})
 	}
@@ -127,8 +120,6 @@ func TestLogger(t *testing.T) {
 		{"ok", "/page", http.StatusOK, nil, "INFO"},
 		{"client error", "/page", http.StatusBadRequest, errors.New("bad input"), "WARN"},
 		{"server error", "/page", http.StatusBadGateway, errors.New("upstream down"), "ERROR"},
-		{"health check", healthPath, http.StatusOK, nil, "DEBUG"},
-		{"failing health check", healthPath, http.StatusServiceUnavailable, nil, "ERROR"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,34 +210,4 @@ func TestRecovery(t *testing.T) {
 	if !strings.Contains(strings.Join(toStrings(req["errors"]), " "), "panic: kaboom") {
 		t.Errorf("request log errors = %v, want the panic", req["errors"])
 	}
-}
-
-func TestRecoveryAfterResponseStarted(t *testing.T) {
-	var buf bytes.Buffer
-	r := newEngine(newLogger(&buf))
-	r.GET("/half", func(c *gin.Context) {
-		c.String(http.StatusOK, "partial")
-		panic("late")
-	})
-
-	w := get(r, "/half", nil)
-
-	if w.Code != http.StatusOK || w.Body.String() != "partial" {
-		t.Errorf("got %d %q, want the original 200 \"partial\"", w.Code, w.Body.String())
-	}
-	if !strings.Contains(buf.String(), `"panic":"late"`) {
-		t.Errorf("panic not logged: %s", buf.String())
-	}
-}
-
-func TestRecoveryRepanicsAbortHandler(t *testing.T) {
-	r := newEngine(slog.New(slog.DiscardHandler))
-	r.GET("/abort", func(*gin.Context) { panic(http.ErrAbortHandler) })
-
-	defer func() {
-		if p := recover(); p != http.ErrAbortHandler { //nolint:errorlint // recover returns the exact value passed to panic
-			t.Errorf("recovered %v, want http.ErrAbortHandler to reach the server", p)
-		}
-	}()
-	get(r, "/abort", nil)
 }

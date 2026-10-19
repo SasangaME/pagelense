@@ -29,7 +29,6 @@ func TestSamples(t *testing.T) {
 				"https://cdn.example.com/",
 				"https://cdn.example.com/products",
 				"https://blog.example.org/",
-				"https://cdn.example.com/area-link",
 			},
 			wantLogin: true,
 		},

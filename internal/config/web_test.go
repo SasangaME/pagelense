@@ -81,13 +81,6 @@ func TestLoadWebInvalid(t *testing.T) {
 	}
 }
 
-func TestLoadWebSamePorts(t *testing.T) {
-	_, err := LoadWeb(env(map[string]string{"ADMIN_PORT": "8080"}))
-	if err == nil || !strings.Contains(err.Error(), "must differ") {
-		t.Fatalf("got %v, want port clash error", err)
-	}
-}
-
 func TestLoadWebReportsAllErrors(t *testing.T) {
 	cfg, err := LoadWeb(env(map[string]string{"API_URL": "nope", "API_TIMEOUT": "never"}))
 	if err == nil {
@@ -100,14 +93,5 @@ func TestLoadWebReportsAllErrors(t *testing.T) {
 	}
 	if cfg != (WebConfig{}) {
 		t.Errorf("got %+v, want zero WebConfig on error", cfg)
-	}
-}
-
-func TestDefaultAPITimeoutOutlastsBackend(t *testing.T) {
-	be := Default()
-	worstCase := be.FetchTimeout + be.LinkBudget
-
-	if got := DefaultWeb().APITimeout; got <= worstCase {
-		t.Errorf("API_TIMEOUT default %v must be longer than the backend's worst case %v", got, worstCase)
 	}
 }

@@ -28,8 +28,7 @@ func parsePage(r io.Reader) (page, error) {
 	var titleSeen, baseSeen bool
 
 	for n := range doc.Descendants() {
-		// SVG and MathML have their own <title> and <a>
-		if n.Type != html.ElementNode || n.Namespace != "" {
+		if n.Type != html.ElementNode {
 			continue
 		}
 
@@ -56,7 +55,7 @@ func parsePage(r io.Reader) (page, error) {
 			p.headings.H5++
 		case atom.H6:
 			p.headings.H6++
-		case atom.A, atom.Area:
+		case atom.A:
 			if href, ok := attr(n, "href"); ok {
 				p.hrefs = append(p.hrefs, href)
 			}
@@ -71,7 +70,7 @@ func parsePage(r io.Reader) (page, error) {
 
 func attr(n *html.Node, key string) (string, bool) {
 	for _, a := range n.Attr {
-		if a.Namespace == "" && a.Key == key {
+		if a.Key == key {
 			return a.Val, true
 		}
 	}

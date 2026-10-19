@@ -1,14 +1,18 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/SasangaME/pagelense/internal/analyzer"
+	"github.com/SasangaME/pagelense/internal/fetcher"
+	"github.com/SasangaME/pagelense/internal/middleware"
 )
 
 func postJSON(h http.Handler, body string) *httptest.ResponseRecorder {
@@ -119,5 +123,66 @@ func TestAnalyzeError(t *testing.T) {
 	status, msg := errorResponse(fake.err)
 	if got := decodeError(t, w, status); got.Message != msg {
 		t.Errorf("message = %q, want %q", got.Message, msg)
+	}
+}
+
+func TestAnalyzerGetsRequestContext(t *testing.T) {
+	fake := &fakeAnalyzer{}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/analyze", strings.NewReader(`{"url": "https://example.com"}`))
+	req.Header.Set(middleware.HeaderRequestID, "from-frontend-1")
+	w := httptest.NewRecorder()
+	newAPIHandler(t, fake).ServeHTTP(w, req)
+
+	if fake.gotRequestID != "from-frontend-1" {
+		t.Errorf("analyzer saw request ID %q, want the incoming one", fake.gotRequestID)
+	}
+	if got := w.Header().Get(middleware.HeaderRequestID); got != "from-frontend-1" {
+		t.Errorf("response X-Request-ID = %q, want the incoming one", got)
+	}
+}
+
+func TestRequestIDOnEveryResponse(t *testing.T) {
+	tests := []struct {
+		name string
+		fake *fakeAnalyzer
+		body string
+	}{
+		{"success", &fakeAnalyzer{}, `{"url": "https://example.com"}`},
+		{"bad request", &fakeAnalyzer{}, `{`},
+		{"analysis error", &fakeAnalyzer{err: analyzer.ErrInvalidURL}, `{"url": "x"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := postJSON(newAPIHandler(t, tt.fake), tt.body)
+			if w.Header().Get(middleware.HeaderRequestID) == "" {
+				t.Errorf("status %d response has no X-Request-ID", w.Code)
+			}
+		})
+	}
+}
+
+func TestCausesAreLoggedNotReturned(t *testing.T) {
+	cause := errors.New("dial tcp 10.0.0.5:443: connect: connection refused")
+	fake := &fakeAnalyzer{err: &fetcher.FetchError{
+		StatusCode: http.StatusBadGateway,
+		Message:    "connection refused by example.com",
+		Err:        cause,
+	}}
+	var logs bytes.Buffer
+	h, err := New(fake, slog.New(slog.NewJSONHandler(&logs, nil)))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	w := postJSON(h, `{"url": "https://example.com"}`)
+
+	if got := decodeError(t, w, http.StatusBadGateway); got.Message != "connection refused by example.com" {
+		t.Errorf("message = %q", got.Message)
+	}
+	if strings.Contains(w.Body.String(), "10.0.0.5") {
+		t.Errorf("response leaks the internal cause: %s", w.Body)
+	}
+	if !strings.Contains(logs.String(), "10.0.0.5") {
+		t.Errorf("log is missing the cause: %s", logs.String())
 	}
 }

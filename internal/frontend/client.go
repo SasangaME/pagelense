@@ -18,8 +18,6 @@ import (
 
 const analyzePath = "/api/v1/analyze"
 
-const maxResponseBytes = 1 << 20
-
 // APIError is returned when the backend fails. Message is safe to show users.
 type APIError struct {
 	Status  int
@@ -47,9 +45,6 @@ func NewClient(baseURL string, timeout time.Duration) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("API URL: %w", err)
-	}
-	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return nil, fmt.Errorf("API URL %q: must be an absolute http:// or https:// URL", baseURL)
 	}
 	return &Client{
 		http:     &http.Client{Timeout: timeout},
@@ -89,7 +84,7 @@ func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, e
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return analyzer.Result{}, transportError(err)
 	}
@@ -106,7 +101,7 @@ func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, e
 
 func statusError(status int, data []byte) *APIError {
 	var eb errorBody
-	if err := json.Unmarshal(data, &eb); err != nil || eb.Error.Message == "" || status < 400 || status > 599 {
+	if err := json.Unmarshal(data, &eb); err != nil || eb.Error.Message == "" {
 		return &APIError{
 			Status:  http.StatusBadGateway,
 			Message: "analysis service sent an unexpected response",

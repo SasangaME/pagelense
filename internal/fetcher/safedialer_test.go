@@ -26,12 +26,8 @@ func TestIsBlocked(t *testing.T) {
 		{ip: "fe80::1", want: true},
 		{ip: "0.0.0.0", want: true},
 		{ip: "::", want: true},
-		{ip: "100.100.100.200", want: true}, // CGNAT
-		{ip: "224.0.0.1", want: true},
-		{ip: "255.255.255.255", want: true},
 		{ip: "::ffff:127.0.0.1", want: true}, // IPv4-mapped loopback
 		{ip: "::ffff:169.254.169.254", want: true},
-		{ip: "64:ff9b::a00:1", want: true}, // NAT64 of 10.0.0.1
 		{ip: "93.184.216.34", want: false},
 		{ip: "8.8.8.8", want: false},
 		{ip: "172.32.0.1", want: false}, // just outside 172.16.0.0/12

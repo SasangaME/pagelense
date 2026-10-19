@@ -93,13 +93,6 @@ func TestLoadInvalid(t *testing.T) {
 	}
 }
 
-func TestLoadSamePorts(t *testing.T) {
-	_, err := Load(env(map[string]string{"PORT": "9090"}))
-	if err == nil || !strings.Contains(err.Error(), "must differ") {
-		t.Fatalf("got %v, want port clash error", err)
-	}
-}
-
 func TestLoadReportsAllErrors(t *testing.T) {
 	cfg, err := Load(env(map[string]string{"PORT": "x", "LINK_WORKERS": "y", "MAX_LINKS": "z"}))
 	if err == nil {

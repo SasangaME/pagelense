@@ -21,16 +21,14 @@ const namespace = "pagelense"
 const unmatchedRoute = "unmatched"
 
 const (
-	outcomeOK       = "ok"
-	outcomeError    = "error"
-	outcomeCanceled = "canceled"
+	outcomeOK    = "ok"
+	outcomeError = "error"
 )
 
 const (
 	linkAccessible   = "accessible"
 	linkInaccessible = "inaccessible"
 	linkFailed       = "failed"
-	linkSkipped      = "skipped"
 )
 
 // NewRegistry returns a registry with the Go and process collectors.
@@ -101,21 +99,17 @@ func (t *timedAnalyzer) Analyze(ctx context.Context, rawURL string) (analyzer.Re
 	start := time.Now()
 	res, err := t.next.Analyze(ctx, rawURL)
 	t.duration.WithLabelValues(outcome(err)).Observe(time.Since(start).Seconds())
-	if t.errors != nil && err != nil && !errors.Is(err, context.Canceled) {
+	if t.errors != nil && err != nil {
 		t.errors.WithLabelValues(backendStatus(err)).Inc()
 	}
 	return res, err
 }
 
 func outcome(err error) string {
-	switch {
-	case err == nil:
+	if err == nil {
 		return outcomeOK
-	case errors.Is(err, context.Canceled):
-		return outcomeCanceled
-	default:
-		return outcomeError
 	}
+	return outcomeError
 }
 
 var analysisBuckets = []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 15, 20, 30}
@@ -125,7 +119,7 @@ func InstrumentAnalyzer(reg prometheus.Registerer, a Analyzer) Analyzer {
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      "analysis_duration_seconds",
-		Help:      "Time to analyze a page (fetch, parse and link checks), by outcome: ok, error or canceled.",
+		Help:      "Time to analyze a page, by outcome: ok or error.",
 		Buckets:   analysisBuckets,
 	}, []string{"outcome"})
 	reg.MustRegister(duration)
@@ -137,7 +131,7 @@ func InstrumentBackend(reg prometheus.Registerer, a Analyzer) Analyzer {
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      "backend_request_duration_seconds",
-		Help:      "Time for a call to the backend API, by outcome: ok, error or canceled.",
+		Help:      "Time for a call to the backend API, by outcome: ok or error.",
 		Buckets:   analysisBuckets,
 	}, []string{"outcome"})
 	errs := prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -167,12 +161,8 @@ func InstrumentChecker(reg prometheus.Registerer, c LinkChecker) LinkChecker {
 	checks := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "link_checks_total",
-		Help:      "Unique links per analysis, by outcome: accessible, inaccessible (4xx/5xx), failed (no response) or skipped (over the cap, budget or canceled).",
+		Help:      "Checked links, by outcome: accessible, inaccessible (4xx/5xx) or failed (no response).",
 	}, []string{"outcome"})
-	// export every outcome from the start
-	for _, o := range []string{linkAccessible, linkInaccessible, linkFailed, linkSkipped} {
-		checks.WithLabelValues(o)
-	}
 	reg.MustRegister(checks)
 	return &countedChecker{next: c, checks: checks}
 }
@@ -181,10 +171,6 @@ func (c *countedChecker) Check(ctx context.Context, urls []string) []linkcheck.R
 	results := c.next.Check(ctx, urls)
 	for _, r := range results {
 		c.checks.WithLabelValues(linkOutcome(r)).Inc()
-	}
-	// links without a result were skipped
-	if skipped := countUnique(urls) - len(results); skipped > 0 {
-		c.checks.WithLabelValues(linkSkipped).Add(float64(skipped))
 	}
 	return results
 }
@@ -198,12 +184,4 @@ func linkOutcome(r linkcheck.Result) string {
 	default:
 		return linkInaccessible
 	}
-}
-
-func countUnique(urls []string) int {
-	seen := make(map[string]struct{}, len(urls))
-	for _, u := range urls {
-		seen[u] = struct{}{}
-	}
-	return len(seen)
 }

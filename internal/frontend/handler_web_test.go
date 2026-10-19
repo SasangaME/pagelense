@@ -132,9 +132,6 @@ func TestAnalyzePartial(t *testing.T) {
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}
-	if v := w.Header().Get("Vary"); v != partialHeader {
-		t.Errorf("Vary = %q, want %q", v, partialHeader)
-	}
 }
 
 func TestAnalyzePartialError(t *testing.T) {

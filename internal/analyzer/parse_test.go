@@ -43,10 +43,6 @@ func TestParsePage(t *testing.T) {
 			wantTitle: "",
 		},
 		{
-			name: "svg title ignored",
-			html: `<body><svg><title>Icon</title></svg></body>`,
-		},
-		{
 			name:         "headings counted per level",
 			html:         `<h1>a</h1><h2>b</h2><h2>c</h2><h3>d</h3><h4>e</h4><h5>f</h5><h6>g</h6><h6>h</h6>`,
 			wantHeadings: Headings{H1: 1, H2: 2, H3: 1, H4: 1, H5: 1, H6: 2},
@@ -57,8 +53,8 @@ func TestParsePage(t *testing.T) {
 			wantHeadings: Headings{H1: 1, H2: 1},
 		},
 		{
-			name:      "anchor and area hrefs collected in order",
-			html:      `<a href="/a">a</a><map><area href="/b"></map><a href="https://example.org/c">c</a>`,
+			name:      "hrefs collected in order",
+			html:      `<a href="/a">a</a><a href="/b">b</a><a href="https://example.org/c">c</a>`,
 			wantHrefs: []string{"/a", "/b", "https://example.org/c"},
 		},
 		{
@@ -70,11 +66,6 @@ func TestParsePage(t *testing.T) {
 			name:      "empty href kept",
 			html:      `<a href="">self</a>`,
 			wantHrefs: []string{""},
-		},
-		{
-			name:      "svg links ignored",
-			html:      `<svg><a href="/svg">x</a></svg>`,
-			wantHrefs: nil,
 		},
 		{
 			name:     "base href",

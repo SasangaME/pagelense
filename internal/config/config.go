@@ -51,7 +51,6 @@ func Load(getenv func(string) string) (Config, error) {
 	l.positiveDuration("SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout)
 	l.positiveInt("LINK_WORKERS", &cfg.LinkWorkers)
 	l.positiveInt("MAX_LINKS", &cfg.MaxLinks)
-	l.differentPorts(cfg.Port, cfg.AdminPort)
 
 	if err := l.err(); err != nil {
 		return Config{}, err
@@ -103,12 +102,6 @@ func (l *loader) logLevel(key string, dst *slog.Level) {
 		if err := dst.UnmarshalText([]byte(v)); err != nil {
 			l.errs = append(l.errs, fmt.Errorf("%s: %q is not one of debug, info, warn, error", key, v))
 		}
-	}
-}
-
-func (l *loader) differentPorts(port, adminPort int) {
-	if port == adminPort {
-		l.errs = append(l.errs, fmt.Errorf("PORT and ADMIN_PORT must differ (both %d)", port))
 	}
 }
 

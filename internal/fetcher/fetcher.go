@@ -101,13 +101,6 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 		return nil, transportError(req.URL.Host, fmt.Errorf("%w (limit %d bytes)", ErrBodyTooLarge, f.maxBodyBytes))
 	}
 
-	if contentType == "" {
-		contentType = http.DetectContentType(body)
-		if !isHTML(contentType) {
-			return nil, contentTypeError(req.URL.Host, contentType)
-		}
-	}
-
 	return &Page{URL: resp.Request.URL, Body: body}, nil
 }
 

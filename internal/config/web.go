@@ -41,7 +41,6 @@ func LoadWeb(getenv func(string) string) (WebConfig, error) {
 	l.positiveDuration("SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout)
 	l.baseURL("API_URL", &cfg.APIURL)
 	l.positiveDuration("API_TIMEOUT", &cfg.APITimeout)
-	l.differentPorts(cfg.Port, cfg.AdminPort)
 
 	if err := l.err(); err != nil {
 		return WebConfig{}, err
