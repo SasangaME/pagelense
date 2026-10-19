@@ -111,8 +111,7 @@ func TestAnalyzeMissingURLIsPassedOn(t *testing.T) {
 	if !fake.called || fake.gotURL != "" {
 		t.Errorf("called = %v, gotURL = %q; want the analyzer called with an empty URL", fake.called, fake.gotURL)
 	}
-	status, _ := errorResponse(fake.err)
-	decodeError(t, w, status)
+	decodeError(t, w, http.StatusBadRequest)
 }
 
 func TestAnalyzeError(t *testing.T) {

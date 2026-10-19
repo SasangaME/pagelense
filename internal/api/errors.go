@@ -1,8 +1,40 @@
 package api
 
-import "net/http"
+import (
+	"context"
+	"errors"
+	"net/http"
 
-// errorResponse maps an analysis error to an HTTP status and a user-facing message. Placeholder until errors.go is implemented.
-func errorResponse(_ error) (int, string) {
-	return http.StatusInternalServerError, "Something went wrong while analyzing the page."
+	"github.com/SasangaME/pagelense/internal/analyzer"
+	"github.com/SasangaME/pagelense/internal/fetcher"
+)
+
+// statusClientClosedRequest is nginx's code for a client that went away before the response; only logs and metrics see it.
+const statusClientClosedRequest = 499
+
+// errorResponse maps an analysis error to an HTTP status and a user-facing message; causes stay in the logs.
+func errorResponse(err error) (int, string) {
+	var fe *fetcher.FetchError
+	switch {
+	case errors.Is(err, analyzer.ErrInvalidURL):
+		// the message describes the user's own input, e.g. "invalid URL: must start with http:// or https://"
+		return http.StatusBadRequest, err.Error()
+	case errors.As(err, &fe):
+		return fetchStatus(fe.StatusCode), fe.Message
+	case errors.Is(err, context.Canceled):
+		return statusClientClosedRequest, "Request was canceled."
+	case errors.Is(err, context.DeadlineExceeded):
+		return http.StatusGatewayTimeout, "Analysis took too long."
+	default:
+		return http.StatusInternalServerError, "Something went wrong while analyzing the page."
+	}
+}
+
+// fetchStatus passes on an upstream error status, so a page that returns 404 is reported as 404.
+// Any other code (e.g. a 304 with no redirect to follow) becomes 502; the message still names the upstream code.
+func fetchStatus(code int) int {
+	if code >= 400 && code <= 599 {
+		return code
+	}
+	return http.StatusBadGateway
 }
