@@ -1,0 +1,49 @@
+name: pagelense
+
+# Admin ports (/metrics, /debug/pprof) stay on the compose network for
+# Prometheus; only the app ports and the Prometheus UI are published.
+
+services:
+  api:
+    build:
+      context: .
+      target: api
+    image: pagelense-api
+    environment:
+      PORT: "8081"
+      ADMIN_PORT: "9091"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    image: pagelense-web
+    environment:
+      PORT: "8080"
+      ADMIN_PORT: "9090"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_URL: http://api:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:

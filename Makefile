@@ -13,7 +13,7 @@ API_ADMIN_PORT := 9091
 WEB_PORT       := 8080
 WEB_ADMIN_PORT := 9090
 
-.PHONY: run-api run-web build test cover lint clean
+.PHONY: run-api run-web build test cover lint clean docker-build compose-up compose-down
 
 run-api:
 	PORT=$(API_PORT) ADMIN_PORT=$(API_ADMIN_PORT) go run ./cmd/api
@@ -40,3 +40,13 @@ lint:
 
 clean:
 	rm -rf $(BIN_DIR) $(COVER) coverage.html
+
+docker-build:
+	docker build --target api -t pagelense-api .
+	docker build --target web -t pagelense-web .
+
+compose-up:
+	docker compose up -d --build
+
+compose-down:
+	docker compose down
