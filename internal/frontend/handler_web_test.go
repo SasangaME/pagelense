@@ -34,8 +34,8 @@ func newWebHandler(t *testing.T, a Analyzer) http.Handler {
 	return h
 }
 
-func postForm(h http.Handler, target string, form url.Values) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(form.Encode()))
+func postForm(h http.Handler, form url.Values) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
@@ -64,7 +64,7 @@ func TestAnalyzeResult(t *testing.T) {
 		Links:        analyzer.LinkStats{Internal: 5, External: 2, Checked: 7, Inaccessible: 1},
 		HasLoginForm: true,
 	}}
-	w := postForm(newWebHandler(t, fake), "/analyze", url.Values{"url": {"https://example.com"}})
+	w := postForm(newWebHandler(t, fake), url.Values{"url": {"https://example.com"}})
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
@@ -81,7 +81,7 @@ func TestAnalyzeResult(t *testing.T) {
 
 func TestAnalyzeErrorKeepsURL(t *testing.T) {
 	fake := &fakeAnalyzer{err: errors.New("boom")}
-	w := postForm(newWebHandler(t, fake), "/analyze", url.Values{"url": {"https://example.com/<x>"}})
+	w := postForm(newWebHandler(t, fake), url.Values{"url": {"https://example.com/<x>"}})
 
 	status, msg := errorResponse(fake.err)
 	if w.Code != status {
@@ -101,7 +101,7 @@ func (panicAnalyzer) Analyze(context.Context, string) (analyzer.Result, error) {
 }
 
 func TestAnalyzePanicRendersErrorPage(t *testing.T) {
-	w := postForm(newWebHandler(t, panicAnalyzer{}), "/analyze", url.Values{"url": {"https://example.com"}})
+	w := postForm(newWebHandler(t, panicAnalyzer{}), url.Values{"url": {"https://example.com"}})
 
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)

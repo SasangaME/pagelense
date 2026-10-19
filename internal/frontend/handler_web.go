@@ -26,6 +26,7 @@ func (s *Server) handleAnalyze(c *gin.Context) {
 	rawURL := c.PostForm("url")
 	res, err := s.analyzer.Analyze(c.Request.Context(), rawURL)
 	if err != nil {
+		_ = c.Error(err) // for the logging middleware; the page only shows msg
 		status, msg := errorResponse(err)
 		c.HTML(status, "error", pageData{URL: rawURL, Status: status, Error: msg})
 		return

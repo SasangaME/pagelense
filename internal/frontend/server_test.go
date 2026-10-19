@@ -26,10 +26,12 @@ func TestMain(m *testing.M) {
 type fakeAnalyzer struct {
 	result analyzer.Result
 	err    error
+	called bool
 	gotURL string
 }
 
 func (f *fakeAnalyzer) Analyze(_ context.Context, rawURL string) (analyzer.Result, error) {
+	f.called = true
 	f.gotURL = rawURL
 	return f.result, f.err
 }
