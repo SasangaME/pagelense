@@ -21,20 +21,20 @@ func TestErrorResponse(t *testing.T) {
 	}{
 		{"invalid URL", &APIError{Status: http.StatusBadRequest, Message: "invalid URL: must start with http:// or https://"},
 			http.StatusBadRequest, "invalid URL: must start with http:// or https://"},
-		{"upstream 404", &APIError{Status: http.StatusNotFound, Message: "upstream returned 404 Not Found"},
-			http.StatusNotFound, "upstream returned 404 Not Found"},
-		{"backend unreachable", &APIError{Status: http.StatusBadGateway, Message: "The analysis service is unavailable. Please try again later.", Err: errors.New("connection refused")},
-			http.StatusBadGateway, "The analysis service is unavailable. Please try again later."},
-		{"backend timeout", &APIError{Status: http.StatusGatewayTimeout, Message: "The analysis service took too long to respond."},
-			http.StatusGatewayTimeout, "The analysis service took too long to respond."},
+		{"page 404", &APIError{Status: http.StatusNotFound, Message: "example.com returned 404 Not Found"},
+			http.StatusNotFound, "example.com returned 404 Not Found"},
+		{"backend unreachable", &APIError{Status: http.StatusBadGateway, Message: "analysis service is unavailable, try again later", Err: errors.New("connection refused")},
+			http.StatusBadGateway, "analysis service is unavailable, try again later"},
+		{"backend timeout", &APIError{Status: http.StatusGatewayTimeout, Message: "analysis service took too long to respond"},
+			http.StatusGatewayTimeout, "analysis service took too long to respond"},
 		{"wrapped API error", fmt.Errorf("analyze: %w", &APIError{Status: http.StatusForbidden, Message: "localhost resolves to a private or reserved address"}),
 			http.StatusForbidden, "localhost resolves to a private or reserved address"},
 		{"API error with non-error status", &APIError{Status: http.StatusOK, Message: "ok"},
-			http.StatusBadGateway, "Could not get the analysis from the analysis service."},
+			http.StatusBadGateway, "could not get a result from the analysis service"},
 		{"canceled", context.Canceled,
-			statusClientClosedRequest, "Request was canceled."},
+			statusClientClosedRequest, "request was canceled"},
 		{"unexpected", errors.New("encode request: boom"),
-			http.StatusBadGateway, "Could not get the analysis from the analysis service."},
+			http.StatusBadGateway, "could not get a result from the analysis service"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -47,13 +47,13 @@ func TestErrorResponse(t *testing.T) {
 }
 
 func TestAnalyzeAPIErrorPage(t *testing.T) {
-	fake := &fakeAnalyzer{err: &APIError{Status: http.StatusNotFound, Message: "upstream returned 404 Not Found"}}
+	fake := &fakeAnalyzer{err: &APIError{Status: http.StatusNotFound, Message: "example.com returned 404 Not Found"}}
 	w := postForm(newWebHandler(t, fake), url.Values{"url": {"https://example.com/missing"}})
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", w.Code)
 	}
-	want := "url=https://example.com/missing|error|404|upstream returned 404 Not Found"
+	want := "url=https://example.com/missing|error|404|example.com returned 404 Not Found"
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}
@@ -62,7 +62,7 @@ func TestAnalyzeAPIErrorPage(t *testing.T) {
 func TestAnalyzeCauseIsLoggedNotShown(t *testing.T) {
 	fake := &fakeAnalyzer{err: &APIError{
 		Status:  http.StatusBadGateway,
-		Message: "The analysis service is unavailable. Please try again later.",
+		Message: "analysis service is unavailable, try again later",
 		Err:     errors.New("dial tcp 10.0.0.7:8081: connect: connection refused"),
 	}}
 	var logs bytes.Buffer

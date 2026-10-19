@@ -68,7 +68,7 @@ func htmlPage(t *testing.T, rawURL, body string) *fetcher.Page {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &fetcher.Page{URL: u, StatusCode: http.StatusOK, ContentType: "text/html", Body: []byte(body)}
+	return &fetcher.Page{URL: u, Body: []byte(body)}
 }
 
 const fullPage = `<!DOCTYPE html>
@@ -142,7 +142,7 @@ func TestAnalyzeInvalidURL(t *testing.T) {
 }
 
 func TestAnalyzeFetchError(t *testing.T) {
-	fetchErr := &fetcher.FetchError{StatusCode: http.StatusNotFound, Message: "upstream returned 404 Not Found"}
+	fetchErr := &fetcher.FetchError{StatusCode: http.StatusNotFound, Message: "example.com returned 404 Not Found"}
 	c := &fakeChecker{}
 
 	_, err := New(&fakeFetcher{err: fetchErr}, c).Analyze(t.Context(), "https://example.com/")

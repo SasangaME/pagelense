@@ -17,12 +17,12 @@ type pageData struct {
 }
 
 // handleIndex renders the URL form.
-func (s *Server) handleIndex(c *gin.Context) {
+func (s *server) handleIndex(c *gin.Context) {
 	s.render(c, http.StatusOK, "index", pageData{})
 }
 
 // handleAnalyze analyzes the submitted URL and renders the result, or the error page with the form still filled in.
-func (s *Server) handleAnalyze(c *gin.Context) {
+func (s *server) handleAnalyze(c *gin.Context) {
 	rawURL := c.PostForm("url")
 	res, err := s.analyzer.Analyze(c.Request.Context(), rawURL)
 	if err != nil {

@@ -145,11 +145,11 @@ func TestClientErrors(t *testing.T) {
 			wantMessage: "invalid URL: must start with http:// or https://",
 		},
 		{
-			name:        "upstream 404",
+			name:        "page 404",
 			status:      http.StatusNotFound,
-			body:        `{"error":{"status":404,"message":"upstream returned 404 Not Found"}}`,
+			body:        `{"error":{"status":404,"message":"example.com returned 404 Not Found"}}`,
 			wantStatus:  http.StatusNotFound,
-			wantMessage: "upstream returned 404 Not Found",
+			wantMessage: "example.com returned 404 Not Found",
 		},
 		{
 			name:        "upstream timeout",
@@ -163,35 +163,35 @@ func TestClientErrors(t *testing.T) {
 			status:      http.StatusServiceUnavailable,
 			body:        `<html>Service Unavailable</html>`,
 			wantStatus:  http.StatusBadGateway,
-			wantMessage: "The analysis service sent an unexpected response.",
+			wantMessage: "analysis service sent an unexpected response",
 		},
 		{
 			name:        "error JSON without message",
 			status:      http.StatusInternalServerError,
 			body:        `{"error":{"status":500}}`,
 			wantStatus:  http.StatusBadGateway,
-			wantMessage: "The analysis service sent an unexpected response.",
+			wantMessage: "analysis service sent an unexpected response",
 		},
 		{
 			name:        "non-error status",
 			status:      http.StatusAccepted,
 			body:        `{"error":{"status":202,"message":"accepted"}}`,
 			wantStatus:  http.StatusBadGateway,
-			wantMessage: "The analysis service sent an unexpected response.",
+			wantMessage: "analysis service sent an unexpected response",
 		},
 		{
 			name:        "malformed result",
 			status:      http.StatusOK,
 			body:        `{"url":`,
 			wantStatus:  http.StatusBadGateway,
-			wantMessage: "The analysis service sent an invalid response.",
+			wantMessage: "analysis service sent an invalid response",
 		},
 		{
 			name:        "result with wrong types",
 			status:      http.StatusOK,
 			body:        `{"headings":"many"}`,
 			wantStatus:  http.StatusBadGateway,
-			wantMessage: "The analysis service sent an invalid response.",
+			wantMessage: "analysis service sent an invalid response",
 		},
 	}
 	for _, tt := range tests {
@@ -204,8 +204,7 @@ func TestClientErrors(t *testing.T) {
 	}
 }
 
-// newHangingBackend returns a backend that calls onRequest (if set) and then never answers. Handlers are released
-// before the server closes, since the server only notices a client hang-up after the request body is read.
+// newHangingBackend returns a backend that calls onRequest (if set) and never answers until the test ends.
 func newHangingBackend(t *testing.T, onRequest func()) *httptest.Server {
 	t.Helper()
 	release := make(chan struct{})
@@ -228,14 +227,14 @@ func TestClientUnreachable(t *testing.T) {
 	srv.Close() // nothing listens on the address any more, so the dial is refused
 
 	_, err := newTestClient(t, srv.URL, time.Second).Analyze(context.Background(), "https://example.com")
-	assertAPIError(t, err, http.StatusBadGateway, "The analysis service is unavailable. Please try again later.")
+	assertAPIError(t, err, http.StatusBadGateway, "analysis service is unavailable, try again later")
 }
 
 func TestClientTimeout(t *testing.T) {
 	srv := newHangingBackend(t, nil)
 
 	_, err := newTestClient(t, srv.URL, 50*time.Millisecond).Analyze(context.Background(), "https://example.com")
-	assertAPIError(t, err, http.StatusGatewayTimeout, "The analysis service took too long to respond.")
+	assertAPIError(t, err, http.StatusGatewayTimeout, "analysis service took too long to respond")
 }
 
 func TestClientContextDeadline(t *testing.T) {
@@ -244,7 +243,7 @@ func TestClientContextDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	_, err := newTestClient(t, srv.URL, time.Second).Analyze(ctx, "https://example.com")
-	assertAPIError(t, err, http.StatusGatewayTimeout, "The analysis service took too long to respond.")
+	assertAPIError(t, err, http.StatusGatewayTimeout, "analysis service took too long to respond")
 }
 
 func TestClientCanceled(t *testing.T) {

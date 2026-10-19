@@ -118,7 +118,7 @@ func TestAnalyzePanicRendersErrorPage(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
-	want := "url=https://example.com|error|500|Something went wrong. Please try again."
+	want := "url=https://example.com|error|500|something went wrong, try again"
 	if got := w.Body.String(); got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}
@@ -160,7 +160,7 @@ func TestAnalyzePartialPanic(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
-	if got, want := w.Body.String(), "error|500|Something went wrong. Please try again."; got != want {
+	if got, want := w.Body.String(), "error|500|something went wrong, try again"; got != want {
 		t.Errorf("body = %q, want %q", got, want)
 	}
 }

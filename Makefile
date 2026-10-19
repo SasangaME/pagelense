@@ -1,5 +1,7 @@
 BIN_DIR := bin
 COVER   := coverage.out
+# make cover fails when total statement coverage is below this percentage.
+COVER_MIN := 70
 
 # Load local settings from .env if it exists (see .env.example).
 ifneq (,$(wildcard .env))
@@ -30,8 +32,10 @@ test:
 
 cover:
 	go test -race -coverprofile=$(COVER) ./...
-	go tool cover -func=$(COVER) | tail -n 1
 	go tool cover -html=$(COVER) -o coverage.html
+	@go tool cover -func=$(COVER) | awk '/^total:/ { sub("%", "", $$3); \
+		printf "total coverage: %s%% (minimum $(COVER_MIN)%%)\n", $$3; \
+		if ($$3 + 0 < $(COVER_MIN)) { print "coverage below $(COVER_MIN)%"; exit 1 } }'
 
 lint:
 	go tool golangci-lint run ./...

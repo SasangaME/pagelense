@@ -55,13 +55,13 @@ func TestContractSuccessJSON(t *testing.T) {
 }
 
 func TestContractErrorJSON(t *testing.T) {
-	fake := &fakeAnalyzer{err: fetchErr(http.StatusNotFound, "upstream returned 404 Not Found")}
+	fake := &fakeAnalyzer{err: fetchErr(http.StatusNotFound, "example.com returned 404 Not Found")}
 	w := postJSON(newAPIHandler(t, fake), `{"url": "https://example.com/missing"}`)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", w.Code)
 	}
-	assertJSON(t, w.Body.Bytes(), `{"error": {"status": 404, "message": "upstream returned 404 Not Found"}}`)
+	assertJSON(t, w.Body.Bytes(), `{"error": {"status": 404, "message": "example.com returned 404 Not Found"}}`)
 }
 
 func TestAnalyzerGetsRequestContext(t *testing.T) {

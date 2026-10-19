@@ -19,6 +19,10 @@ func parseURL(raw string) (*url.URL, error) {
 
 	u, err := url.Parse(raw)
 	if err != nil {
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidURL, err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {

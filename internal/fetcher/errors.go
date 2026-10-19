@@ -25,9 +25,9 @@ func (e *FetchError) Error() string {
 
 func (e *FetchError) Unwrap() error { return e.Err }
 
-// statusError reports an upstream non-2xx response.
-func statusError(code int) *FetchError {
-	msg := fmt.Sprintf("upstream returned %d", code)
+// statusError reports a non-2xx response from the page's host.
+func statusError(host string, code int) *FetchError {
+	msg := fmt.Sprintf("%s returned %d", host, code)
 	if text := http.StatusText(code); text != "" {
 		msg += " " + text
 	}

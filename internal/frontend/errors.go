@@ -18,8 +18,8 @@ func errorResponse(err error) (int, string) {
 		return apiErr.Status, apiErr.Message
 	case errors.Is(err, context.Canceled):
 		// the browser went away; logging it as 502 would count it as a backend failure
-		return statusClientClosedRequest, "Request was canceled."
+		return statusClientClosedRequest, "request was canceled"
 	default:
-		return http.StatusBadGateway, "Could not get the analysis from the analysis service."
+		return http.StatusBadGateway, "could not get a result from the analysis service"
 	}
 }

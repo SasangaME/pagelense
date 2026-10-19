@@ -92,7 +92,7 @@ func TestResultPageNoTitleNoLogin(t *testing.T) {
 }
 
 func TestErrorPage(t *testing.T) {
-	fake := &fakeAnalyzer{err: &APIError{Status: http.StatusNotFound, Message: "upstream returned 404 Not Found"}}
+	fake := &fakeAnalyzer{err: &APIError{Status: http.StatusNotFound, Message: "example.com returned 404 Not Found"}}
 	w := postForm(newRealHandler(t, fake), url.Values{"url": {`https://example.com/missing?q="><b>`}})
 
 	if w.Code != http.StatusNotFound {
@@ -102,7 +102,7 @@ func TestErrorPage(t *testing.T) {
 	assertContains(t, body,
 		`<section class="error" role="alert">`,
 		"<h1>Error 404 Not Found</h1>",
-		"<p>upstream returned 404 Not Found</p>",
+		"<p>example.com returned 404 Not Found</p>",
 		// the submitted URL stays in the form, escaped so it cannot break out of the attribute
 		`value="https://example.com/missing?q=&#34;&gt;&lt;b&gt;"`,
 	)

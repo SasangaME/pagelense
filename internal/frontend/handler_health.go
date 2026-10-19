@@ -7,6 +7,6 @@ import (
 )
 
 // handleHealth reports that the process is up and serving; it does not call the backend, so a backend outage never fails it.
-func (s *Server) handleHealth(c *gin.Context) {
+func (s *server) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

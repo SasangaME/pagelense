@@ -122,7 +122,7 @@ func TestPagesRenderInsideLayout(t *testing.T) {
 	}
 	for _, name := range pageNames {
 		w := httptest.NewRecorder()
-		if err := p.Instance(name, "<x>").Render(w); err != nil {
+		if err := p[name].ExecuteTemplate(w, "layout", "<x>"); err != nil {
 			t.Fatalf("render %s: %v", name, err)
 		}
 		// each page keeps its own "content", and data is HTML-escaped

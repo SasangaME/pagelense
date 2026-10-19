@@ -40,12 +40,6 @@ func TestFetchOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
-	if page.StatusCode != http.StatusOK {
-		t.Errorf("StatusCode = %d, want 200", page.StatusCode)
-	}
-	if page.ContentType != "text/html; charset=utf-8" {
-		t.Errorf("ContentType = %q", page.ContentType)
-	}
 	if string(page.Body) != "<!DOCTYPE html><title>Hi</title>" {
 		t.Errorf("Body = %q", page.Body)
 	}
@@ -62,10 +56,10 @@ func TestFetchNon2xx(t *testing.T) {
 		code    int
 		wantMsg string
 	}{
-		{code: http.StatusNotFound, wantMsg: "upstream returned 404 Not Found"},
-		{code: http.StatusInternalServerError, wantMsg: "upstream returned 500 Internal Server Error"},
-		{code: http.StatusServiceUnavailable, wantMsg: "upstream returned 503 Service Unavailable"},
-		{code: 599, wantMsg: "upstream returned 599"},
+		{code: http.StatusNotFound, wantMsg: "returned 404 Not Found"},
+		{code: http.StatusInternalServerError, wantMsg: "returned 500 Internal Server Error"},
+		{code: http.StatusServiceUnavailable, wantMsg: "returned 503 Service Unavailable"},
+		{code: 599, wantMsg: "returned 599"},
 	}
 
 	for _, tt := range tests {
@@ -77,8 +71,9 @@ func TestFetchNon2xx(t *testing.T) {
 
 			_, err := New(testOptions()).Fetch(context.Background(), srv.URL)
 			fe := requireFetchError(t, err, tt.code)
-			if fe.Message != tt.wantMsg {
-				t.Errorf("Message = %q, want %q", fe.Message, tt.wantMsg)
+			// the message names the page's host (host:port for httptest)
+			if want := strings.TrimPrefix(srv.URL, "http://") + " " + tt.wantMsg; fe.Message != want {
+				t.Errorf("Message = %q, want %q", fe.Message, want)
 			}
 		})
 	}
@@ -194,11 +189,10 @@ func TestFetchBodyLimit(t *testing.T) {
 
 func TestFetchContentType(t *testing.T) {
 	tests := []struct {
-		name       string
-		header     string // empty: no Content-Type header, so the body is sniffed
-		body       string
-		wantErr    bool
-		wantDetect string
+		name    string
+		header  string // empty: no Content-Type header, so the body is sniffed
+		body    string
+		wantErr bool
 	}{
 		{name: "html", header: "text/html"},
 		{name: "html with charset", header: "text/html; charset=ISO-8859-1"},
@@ -210,7 +204,7 @@ func TestFetchContentType(t *testing.T) {
 		{name: "pdf", header: "application/pdf", wantErr: true},
 		{name: "xml", header: "application/xml", wantErr: true},
 		{name: "malformed", header: "text/html;;;=", wantErr: true},
-		{name: "missing, sniffed as html", body: "<!DOCTYPE html><title>x</title>", wantDetect: "text/html; charset=utf-8"},
+		{name: "missing, sniffed as html", body: "<!DOCTYPE html><title>x</title>"},
 		{name: "missing, sniffed as text", body: "just some text", wantErr: true},
 	}
 
@@ -240,12 +234,8 @@ func TestFetchContentType(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Fetch: %v", err)
 			}
-			want := tt.header
-			if want == "" {
-				want = tt.wantDetect
-			}
-			if page.ContentType != want {
-				t.Errorf("ContentType = %q, want %q", page.ContentType, want)
+			if string(page.Body) != tt.body {
+				t.Errorf("Body = %q, want %q", page.Body, tt.body)
 			}
 		})
 	}
@@ -381,7 +371,7 @@ func TestTransportError(t *testing.T) {
 }
 
 func TestFetchErrorString(t *testing.T) {
-	if got := statusError(http.StatusNotFound).Error(); got != "upstream returned 404 Not Found" {
+	if got := statusError("example.com", http.StatusNotFound).Error(); got != "example.com returned 404 Not Found" {
 		t.Errorf("without cause: %q", got)
 	}
 	err := &FetchError{StatusCode: http.StatusBadGateway, Message: "could not fetch example.com", Err: errors.New("boom")}

@@ -12,6 +12,9 @@ import (
 // statusClientClosedRequest is nginx's code for a client that went away before the response; only logs and metrics see it.
 const statusClientClosedRequest = 499
 
+// msgInternal is the message for a failure the user can do nothing about, the cause goes to the logs only.
+const msgInternal = "something went wrong while analyzing the page"
+
 // errorResponse maps an analysis error to an HTTP status and a user-facing message; causes stay in the logs.
 func errorResponse(err error) (int, string) {
 	var fe *fetcher.FetchError
@@ -22,11 +25,11 @@ func errorResponse(err error) (int, string) {
 	case errors.As(err, &fe):
 		return fetchStatus(fe.StatusCode), fe.Message
 	case errors.Is(err, context.Canceled):
-		return statusClientClosedRequest, "Request was canceled."
+		return statusClientClosedRequest, "request was canceled"
 	case errors.Is(err, context.DeadlineExceeded):
-		return http.StatusGatewayTimeout, "Analysis took too long."
+		return http.StatusGatewayTimeout, "analysis took too long"
 	default:
-		return http.StatusInternalServerError, "Something went wrong while analyzing the page."
+		return http.StatusInternalServerError, msgInternal
 	}
 }
 

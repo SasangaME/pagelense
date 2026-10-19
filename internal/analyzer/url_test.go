@@ -53,3 +53,27 @@ func TestParseURL(t *testing.T) {
 		})
 	}
 }
+
+// The message is shown to the user as is, so it must explain the input without Go's url.Error wrapping.
+func TestParseURLMessages(t *testing.T) {
+	tests := []struct {
+		raw  string
+		want string
+	}{
+		{"", "invalid URL: URL is required"},
+		{"example.com", "invalid URL: must start with http:// or https://"},
+		{"https://", "invalid URL: missing host"},
+		{"http://exa mple.com", `invalid URL: invalid character " " in host name`},
+		{"http://[::1", "invalid URL: missing ']' in host"},
+		{"http://example.com:abc/", `invalid URL: invalid port ":abc" after host`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			_, err := parseURL(tt.raw)
+			if err == nil || err.Error() != tt.want {
+				t.Errorf("parseURL(%q) error = %v, want %q", tt.raw, err, tt.want)
+			}
+		})
+	}
+}

@@ -18,15 +18,14 @@ type Analyzer interface {
 	Analyze(ctx context.Context, rawURL string) (analyzer.Result, error)
 }
 
-// Server holds the dependencies shared by the handlers.
-type Server struct {
+// server holds the dependencies shared by the handlers.
+type server struct {
 	analyzer Analyzer
 }
 
-// New returns the backend's HTTP handler: the analyze endpoint and health check, with request IDs, logging and recovery.
-// Any extra middleware, such as request metrics, runs first, so it sees every request and the final status.
+// New returns the backend's HTTP handler with request IDs, logging and recovery; extra middleware, such as metrics, runs first.
 func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
-	s := &Server{analyzer: a}
+	s := &server{analyzer: a}
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
 	// nil means X-Forwarded-For is ignored and ClientIP is the TCP peer
@@ -38,7 +37,7 @@ func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, 
 		middleware.RequestID(),
 		middleware.Logger(log),
 		middleware.Recovery(log, func(c *gin.Context) {
-			writeErrorBody(c, http.StatusInternalServerError, "Something went wrong while analyzing the page.")
+			writeErrorBody(c, http.StatusInternalServerError, msgInternal)
 		}),
 	)
 

@@ -22,8 +22,8 @@ type Analyzer interface {
 	Analyze(ctx context.Context, rawURL string) (analyzer.Result, error)
 }
 
-// Server holds the dependencies shared by the handlers.
-type Server struct {
+// server holds the dependencies shared by the handlers.
+type server struct {
 	analyzer Analyzer
 	pages    pages
 }
@@ -32,7 +32,7 @@ type Server struct {
 const partialHeader = "X-Partial"
 
 // render writes the named page: the whole layout, or only its "content" block for a partial request.
-func (s *Server) render(c *gin.Context, status int, name string, data pageData) {
+func (s *server) render(c *gin.Context, status int, name string, data pageData) {
 	block := "layout"
 	if c.GetHeader(partialHeader) != "" {
 		block = "content"
@@ -42,8 +42,7 @@ func (s *Server) render(c *gin.Context, status int, name string, data pageData) 
 	c.Render(status, render.HTML{Template: s.pages[name], Name: block, Data: data})
 }
 
-// New returns the frontend's HTTP handler: web pages, health check and static files, with request IDs, logging and recovery.
-// Any extra middleware, such as request metrics, runs first, so it sees every request and the final status.
+// New returns the frontend's HTTP handler with request IDs, logging and recovery; extra middleware, such as metrics, runs first.
 func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
 	return newHandler(a, web.FS, log, extra...)
 }
@@ -59,9 +58,8 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger, extra ...gin.HandlerFu
 		return nil, fmt.Errorf("static files: %w", err)
 	}
 
-	s := &Server{analyzer: a, pages: pages}
+	s := &server{analyzer: a, pages: pages}
 	r := gin.New()
-	r.HTMLRender = pages
 	r.HandleMethodNotAllowed = true
 	// nil means X-Forwarded-For is ignored and ClientIP is the TCP peer
 	if err := r.SetTrustedProxies(nil); err != nil {
@@ -75,7 +73,7 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger, extra ...gin.HandlerFu
 			s.render(c, http.StatusInternalServerError, "error", pageData{
 				URL:    c.PostForm("url"),
 				Status: http.StatusInternalServerError,
-				Error:  "Something went wrong. Please try again.",
+				Error:  "something went wrong, try again",
 			})
 		}),
 	)
@@ -93,13 +91,8 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger, extra ...gin.HandlerFu
 // pageNames are the templates in web/templates that render inside layout.html.
 var pageNames = []string{"index", "result", "error"}
 
-// pages maps a page name to its template set; it implements render.HTMLRender for c.HTML.
+// pages maps a page name to its template set; render picks the "layout" or "content" block from it.
 type pages map[string]*template.Template
-
-// Instance renders the "layout" template of the named page; each page defines the "content" block the layout includes.
-func (p pages) Instance(name string, data any) render.Render {
-	return render.HTML{Template: p[name], Name: "layout", Data: data}
-}
 
 // funcs are the helpers templates can call; statusText turns 404 into "Not Found".
 var funcs = template.FuncMap{"statusText": http.StatusText}

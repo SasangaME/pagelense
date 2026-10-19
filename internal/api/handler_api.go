@@ -25,17 +25,17 @@ type errorDetail struct {
 }
 
 // handleAnalyze analyzes the URL in the JSON body and returns the result, or an error body with the same status.
-func (s *Server) handleAnalyze(c *gin.Context) {
+func (s *server) handleAnalyze(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBytes)
 
 	var req analyzeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			writeError(c, err, http.StatusRequestEntityTooLarge, "Request body is too large.")
+			writeError(c, err, http.StatusRequestEntityTooLarge, "request body is too large")
 			return
 		}
-		writeError(c, err, http.StatusBadRequest, `Request body must be JSON like {"url": "https://example.com"}.`)
+		writeError(c, err, http.StatusBadRequest, `request body must be JSON like {"url": "https://example.com"}`)
 		return
 	}
 

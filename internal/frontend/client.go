@@ -44,8 +44,7 @@ type Client struct {
 	endpoint string
 }
 
-// NewClient returns a client for the backend at baseURL (e.g. http://localhost:8081). timeout bounds each call,
-// so it must be longer than the backend's page fetch plus link checks.
+// NewClient returns a client for the backend at baseURL; timeout bounds each call, so it must outlast the backend's fetch plus link checks.
 func NewClient(baseURL string, timeout time.Duration) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
@@ -71,8 +70,7 @@ type errorBody struct {
 	} `json:"error"`
 }
 
-// Analyze asks the backend to analyze rawURL. Backend errors keep their status and message; a backend that
-// cannot be reached gives 502, and one that does not answer in time gives 504. Caller cancellation is returned as is.
+// Analyze asks the backend to analyze rawURL; backend errors keep their status, unreachable gives 502, no answer in time 504.
 func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, error) {
 	body, err := json.Marshal(analyzeRequest{URL: rawURL})
 	if err != nil {
@@ -104,19 +102,18 @@ func (c *Client) Analyze(ctx context.Context, rawURL string) (analyzer.Result, e
 	}
 	var res analyzer.Result
 	if err := json.Unmarshal(data, &res); err != nil {
-		return analyzer.Result{}, &APIError{http.StatusBadGateway, "The analysis service sent an invalid response.", err}
+		return analyzer.Result{}, &APIError{http.StatusBadGateway, "analysis service sent an invalid response", err}
 	}
 	return res, nil
 }
 
-// statusError turns a non-200 backend response into an APIError. A body that is not the backend's error JSON
-// (e.g. an HTML page from a proxy) gives 502, with the backend's status in the cause.
+// statusError turns a non-200 backend response into an APIError; a body that is not the API's error JSON gives 502.
 func statusError(status int, data []byte) *APIError {
 	var eb errorBody
 	if err := json.Unmarshal(data, &eb); err != nil || eb.Error.Message == "" || status < 400 || status > 599 {
 		return &APIError{
 			Status:  http.StatusBadGateway,
-			Message: "The analysis service sent an unexpected response.",
+			Message: "analysis service sent an unexpected response",
 			Err:     fmt.Errorf("backend returned %d with a body that is not an API error", status),
 		}
 	}
@@ -130,7 +127,7 @@ func transportError(err error) error {
 	}
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
-		return &APIError{http.StatusGatewayTimeout, "The analysis service took too long to respond.", err}
+		return &APIError{http.StatusGatewayTimeout, "analysis service took too long to respond", err}
 	}
-	return &APIError{http.StatusBadGateway, "The analysis service is unavailable. Please try again later.", err}
+	return &APIError{http.StatusBadGateway, "analysis service is unavailable, try again later", err}
 }

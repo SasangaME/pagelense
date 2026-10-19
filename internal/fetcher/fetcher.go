@@ -31,12 +31,10 @@ type Options struct {
 	AllowPrivateIPs bool
 }
 
-// Page is a downloaded web page.
+// Page is a downloaded HTML page.
 type Page struct {
-	URL         *url.URL // final URL after redirects; relative links resolve against it
-	StatusCode  int
-	ContentType string
-	Body        []byte
+	URL  *url.URL // final URL after redirects; relative links resolve against it
+	Body []byte
 }
 
 // Fetcher downloads web pages. It is safe for concurrent use.
@@ -87,7 +85,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, statusError(resp.StatusCode)
+		return nil, statusError(req.URL.Host, resp.StatusCode)
 	}
 
 	// checked before reading so non-HTML bodies are not downloaded
@@ -112,12 +110,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Page, error) {
 		}
 	}
 
-	return &Page{
-		URL:         resp.Request.URL,
-		StatusCode:  resp.StatusCode,
-		ContentType: contentType,
-		Body:        body,
-	}, nil
+	return &Page{URL: resp.Request.URL, Body: body}, nil
 }
 
 // isHTML reports whether contentType is text/html or application/xhtml+xml.
