@@ -83,11 +83,14 @@ func (p pages) Instance(name string, data any) render.Render {
 	return render.HTML{Template: p[name], Name: "layout", Data: data}
 }
 
+// funcs are the helpers templates can call; statusText turns 404 into "Not Found".
+var funcs = template.FuncMap{"statusText": http.StatusText}
+
 // parsePages parses each page with its own copy of the layout, since every page defines "content".
 func parsePages(fsys fs.FS) (pages, error) {
 	p := make(pages, len(pageNames))
 	for _, name := range pageNames {
-		t, err := template.ParseFS(fsys, "templates/layout.html", "templates/"+name+".html")
+		t, err := template.New(name).Funcs(funcs).ParseFS(fsys, "templates/layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s template: %w", name, err)
 		}

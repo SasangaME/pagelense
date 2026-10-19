@@ -1,0 +1,7 @@
+{{define "content"}}
+<section class="error" role="alert">
+  <h1>Error {{.Status}}{{with statusText .Status}} {{.}}{{end}}</h1>
+  <p>{{.Error}}</p>
+</section>
+{{template "form" .}}
+{{end}}

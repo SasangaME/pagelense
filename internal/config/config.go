@@ -16,7 +16,7 @@ type Config struct {
 	LogLevel        slog.Level    // LOG_LEVEL: debug, info, warn or error
 	FetchTimeout    time.Duration // FETCH_TIMEOUT: whole page fetch, including redirects and body
 	LinkTimeout     time.Duration // LINK_TIMEOUT: per checked link
-	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: graceful shutdown; keep below the ECS stop timeout (30s)
+	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: how long in-flight requests get to finish on Ctrl+C or SIGTERM
 	LinkWorkers     int           // LINK_WORKERS: concurrent link checks per analysis
 	MaxLinks        int           // MAX_LINKS: unique links checked per analysis
 }
@@ -35,61 +35,83 @@ func Default() Config {
 	}
 }
 
-// Load reads settings with getenv (usually os.Getenv), using Default for unset or empty variables and reporting every invalid one.
+// Load reads the backend's settings with getenv (usually os.Getenv), using Default for unset or empty variables and reporting every invalid one.
 func Load(getenv func(string) string) (Config, error) {
 	cfg := Default()
-	var errs []error
+	l := loader{getenv: getenv}
 
-	port := func(key string, dst *int) {
-		if v := getenv(key); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 || n > 65535 {
-				errs = append(errs, fmt.Errorf("%s: %q is not a port (1-65535)", key, v))
-				return
-			}
-			*dst = n
-		}
-	}
-	positiveInt := func(key string, dst *int) {
-		if v := getenv(key); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 {
-				errs = append(errs, fmt.Errorf("%s: %q is not a positive integer", key, v))
-				return
-			}
-			*dst = n
-		}
-	}
-	positiveDuration := func(key string, dst *time.Duration) {
-		if v := getenv(key); v != "" {
-			d, err := time.ParseDuration(v)
-			if err != nil || d <= 0 {
-				errs = append(errs, fmt.Errorf("%s: %q is not a positive duration (e.g. 10s, 500ms)", key, v))
-				return
-			}
-			*dst = d
-		}
-	}
+	l.port("PORT", &cfg.Port)
+	l.port("ADMIN_PORT", &cfg.AdminPort)
+	l.logLevel("LOG_LEVEL", &cfg.LogLevel)
+	l.positiveDuration("FETCH_TIMEOUT", &cfg.FetchTimeout)
+	l.positiveDuration("LINK_TIMEOUT", &cfg.LinkTimeout)
+	l.positiveDuration("SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout)
+	l.positiveInt("LINK_WORKERS", &cfg.LinkWorkers)
+	l.positiveInt("MAX_LINKS", &cfg.MaxLinks)
+	l.differentPorts(cfg.Port, cfg.AdminPort)
 
-	port("PORT", &cfg.Port)
-	port("ADMIN_PORT", &cfg.AdminPort)
-	if v := getenv("LOG_LEVEL"); v != "" {
-		if err := cfg.LogLevel.UnmarshalText([]byte(v)); err != nil {
-			errs = append(errs, fmt.Errorf("LOG_LEVEL: %q is not one of debug, info, warn, error", v))
-		}
-	}
-	positiveDuration("FETCH_TIMEOUT", &cfg.FetchTimeout)
-	positiveDuration("LINK_TIMEOUT", &cfg.LinkTimeout)
-	positiveDuration("SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout)
-	positiveInt("LINK_WORKERS", &cfg.LinkWorkers)
-	positiveInt("MAX_LINKS", &cfg.MaxLinks)
-
-	if cfg.Port == cfg.AdminPort {
-		errs = append(errs, fmt.Errorf("PORT and ADMIN_PORT must differ (both %d)", cfg.Port))
-	}
-
-	if err := errors.Join(errs...); err != nil {
-		return Config{}, fmt.Errorf("invalid config: %w", err)
+	if err := l.err(); err != nil {
+		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// loader reads variables into settings and collects every invalid one, so a bad config is reported in one go.
+type loader struct {
+	getenv func(string) string
+	errs   []error
+}
+
+func (l *loader) port(key string, dst *int) {
+	if v := l.getenv(key); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 65535 {
+			l.errs = append(l.errs, fmt.Errorf("%s: %q is not a port (1-65535)", key, v))
+			return
+		}
+		*dst = n
+	}
+}
+
+func (l *loader) positiveInt(key string, dst *int) {
+	if v := l.getenv(key); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			l.errs = append(l.errs, fmt.Errorf("%s: %q is not a positive integer", key, v))
+			return
+		}
+		*dst = n
+	}
+}
+
+func (l *loader) positiveDuration(key string, dst *time.Duration) {
+	if v := l.getenv(key); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			l.errs = append(l.errs, fmt.Errorf("%s: %q is not a positive duration (e.g. 10s, 500ms)", key, v))
+			return
+		}
+		*dst = d
+	}
+}
+
+func (l *loader) logLevel(key string, dst *slog.Level) {
+	if v := l.getenv(key); v != "" {
+		if err := dst.UnmarshalText([]byte(v)); err != nil {
+			l.errs = append(l.errs, fmt.Errorf("%s: %q is not one of debug, info, warn, error", key, v))
+		}
+	}
+}
+
+func (l *loader) differentPorts(port, adminPort int) {
+	if port == adminPort {
+		l.errs = append(l.errs, fmt.Errorf("PORT and ADMIN_PORT must differ (both %d)", port))
+	}
+}
+
+func (l *loader) err() error {
+	if err := errors.Join(l.errs...); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+	return nil
 }
