@@ -58,9 +58,11 @@ func newTransport(allowPrivate bool) *http.Transport {
 	}
 	// Proxy stays nil: a proxy would dial on our behalf and bypass the check.
 	return &http.Transport{
-		DialContext:           dialer.DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
+		DialContext:       dialer.DialContext,
+		ForceAttemptHTTP2: true,
+		MaxIdleConns:      100,
+		// most link checks go to the page's own host; Go's default of 2 would redial (and redo TLS) for every extra worker
+		MaxIdleConnsPerHost:   100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,

@@ -3,6 +3,7 @@ package linkcheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -21,29 +22,50 @@ func (r Result) Accessible() bool {
 	return r.Err == nil && r.StatusCode < 400
 }
 
+// errBudgetExceeded is the cancel cause once Options.Budget runs out, so checks cut short by it can be told apart.
+var errBudgetExceeded = errors.New("link check budget exceeded")
+
 // Options controls how links are checked.
 type Options struct {
 	Workers  int           // number of concurrent checks; values below 1 mean 1
 	Timeout  time.Duration // per link, covering the HEAD and any GET fallback; 0 means no limit
+	Budget   time.Duration // whole Check call; links not finished in time are left out of the results; 0 means no limit
 	MaxLinks int           // most unique URLs checked per call; values below 1 mean no limit
+	// UserAgent is sent with every check; Go's default agent is throttled or refused by many sites.
+	UserAgent string
 }
 
 // Checker checks links with a fixed number of workers. It is safe for concurrent use.
 type Checker struct {
-	client   *http.Client
-	workers  int
-	timeout  time.Duration
-	maxLinks int
+	client    *http.Client
+	workers   int
+	timeout   time.Duration
+	budget    time.Duration
+	maxLinks  int
+	userAgent string
 }
 
 // New returns a Checker that sends requests with client.
 func New(client *http.Client, opts Options) *Checker {
-	return &Checker{client: client, workers: max(opts.Workers, 1), timeout: opts.Timeout, maxLinks: opts.MaxLinks}
+	return &Checker{
+		client:    client,
+		workers:   max(opts.Workers, 1),
+		timeout:   opts.Timeout,
+		budget:    opts.Budget,
+		maxLinks:  opts.MaxLinks,
+		userAgent: opts.UserAgent,
+	}
 }
 
-// Check checks the first MaxLinks unique urls concurrently; results are in completion order and omit URLs skipped after ctx is canceled.
+// Check checks the first MaxLinks unique urls concurrently; results are in completion order and omit URLs skipped
+// after ctx is canceled or not finished within the budget.
 func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 	urls = unique(urls, c.maxLinks)
+	if c.budget > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeoutCause(ctx, c.budget, errBudgetExceeded)
+		defer cancel()
+	}
 	jobs := make(chan string)
 	results := make(chan Result)
 
@@ -53,7 +75,12 @@ func (c *Checker) Check(ctx context.Context, urls []string) []Result {
 		go func() {
 			defer wg.Done()
 			for u := range jobs {
-				results <- c.check(ctx, u)
+				r := c.check(ctx, u)
+				// a check cut short by the budget says nothing about the link, so it is not counted as checked
+				if r.Err != nil && errors.Is(context.Cause(ctx), errBudgetExceeded) {
+					continue
+				}
+				results <- r
 			}
 		}()
 	}
@@ -105,6 +132,9 @@ func (c *Checker) request(ctx context.Context, method, rawURL string) (int, erro
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
 	if err != nil {
 		return 0, fmt.Errorf("build request: %w", err)
+	}
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {

@@ -47,9 +47,11 @@ func run() error {
 		UserAgent:    userAgent,
 	})
 	checker := linkcheck.New(f.Client(), linkcheck.Options{
-		Workers:  cfg.LinkWorkers,
-		Timeout:  cfg.LinkTimeout,
-		MaxLinks: cfg.MaxLinks,
+		Workers:   cfg.LinkWorkers,
+		Timeout:   cfg.LinkTimeout,
+		Budget:    cfg.LinkBudget,
+		MaxLinks:  cfg.MaxLinks,
+		UserAgent: userAgent,
 	})
 
 	// the request logger covers what Gin's debug output would print
@@ -65,7 +67,7 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		IdleTimeout:       60 * time.Second,
-		// no WriteTimeout: an analysis can legitimately take FETCH_TIMEOUT plus all link checks
+		// no WriteTimeout: an analysis can legitimately take FETCH_TIMEOUT plus LINK_BUDGET
 	}
 	log.Info("api listening", "addr", srv.Addr)
 	if err := srv.ListenAndServe(); err != nil {

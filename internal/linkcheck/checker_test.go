@@ -274,6 +274,68 @@ func TestCheckCanceledInFlight(t *testing.T) {
 	}
 }
 
+func TestCheckBudget(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/slow" {
+			blockUntilDone(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	// the fast link finishes; the slow one is still in flight and the rest are never sent when the budget runs out
+	urls := append([]string{srv.URL + "/fast", srv.URL + "/slow"}, distinctURLs(srv.URL+"/queued", 5)...)
+	start := time.Now()
+	results := New(srv.Client(), Options{Workers: 1, Budget: 100 * time.Millisecond}).
+		Check(context.Background(), urls)
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("Check took %v, want about the 100ms budget", elapsed)
+	}
+	if len(results) != 1 || results[0].URL != srv.URL+"/fast" || !results[0].Accessible() {
+		t.Errorf("got %+v, want only the accessible /fast result", results)
+	}
+}
+
+func TestCheckBudgetKeepsLinkTimeouts(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(blockUntilDone))
+	defer srv.Close()
+
+	// the per-link timeout fires well within the budget, so the link counts as checked and inaccessible
+	results := New(srv.Client(), Options{Workers: 1, Timeout: 50 * time.Millisecond, Budget: time.Second}).
+		Check(context.Background(), []string{srv.URL})
+	if len(results) != 1 || !errors.Is(results[0].Err, context.DeadlineExceeded) {
+		t.Errorf("got %+v, want one deadline error", results)
+	}
+}
+
+func TestCheckUserAgent(t *testing.T) {
+	tests := []struct {
+		name, userAgent, want string
+	}{
+		{"set", "pagelense-test/1.0", "pagelense-test/1.0"},
+		{"unset keeps Go's default", "", "Go-http-client/1.1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got atomic.Value
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got.Store(r.UserAgent())
+				// a 405 makes the checker retry with GET, which must carry the agent too
+				if r.Method == http.MethodHead {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+				} else if r.UserAgent() != tt.want {
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			}))
+			defer srv.Close()
+
+			results := New(srv.Client(), Options{UserAgent: tt.userAgent}).Check(context.Background(), []string{srv.URL})
+			if got.Load() != tt.want || len(results) != 1 || !results[0].Accessible() {
+				t.Errorf("server saw User-Agent %v, results %+v; want %q on HEAD and GET", got.Load(), results, tt.want)
+			}
+		})
+	}
+}
+
 func TestUnique(t *testing.T) {
 	tests := []struct {
 		name  string

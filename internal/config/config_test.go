@@ -38,6 +38,7 @@ func TestLoadOverrides(t *testing.T) {
 		"LOG_LEVEL":        "DEBUG",
 		"FETCH_TIMEOUT":    "20s",
 		"LINK_TIMEOUT":     "1500ms",
+		"LINK_BUDGET":      "45s",
 		"SHUTDOWN_TIMEOUT": "25s",
 		"LINK_WORKERS":     "32",
 		"MAX_LINKS":        "500",
@@ -51,6 +52,7 @@ func TestLoadOverrides(t *testing.T) {
 		LogLevel:        slog.LevelDebug,
 		FetchTimeout:    20 * time.Second,
 		LinkTimeout:     1500 * time.Millisecond,
+		LinkBudget:      45 * time.Second,
 		ShutdownTimeout: 25 * time.Second,
 		LinkWorkers:     32,
 		MaxLinks:        500,
@@ -72,6 +74,7 @@ func TestLoadInvalid(t *testing.T) {
 		{"FETCH_TIMEOUT", "10"}, // no unit
 		{"FETCH_TIMEOUT", "0s"},
 		{"LINK_TIMEOUT", "-5s"},
+		{"LINK_BUDGET", "0s"},
 		{"SHUTDOWN_TIMEOUT", "soon"},
 		{"LINK_WORKERS", "0"},
 		{"LINK_WORKERS", "1.5"},

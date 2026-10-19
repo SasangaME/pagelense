@@ -25,8 +25,8 @@ func DefaultWeb() WebConfig {
 		LogLevel:        slog.LevelInfo,
 		ShutdownTimeout: 15 * time.Second,
 		APIURL:          "http://localhost:8081",
-		// the backend's defaults allow 10s fetch + 100 links / 10 workers × 5s = 60s, plus headroom
-		APITimeout: 70 * time.Second,
+		// the backend's defaults allow 10s fetch + 10s link budget = 20s, plus headroom
+		APITimeout: 30 * time.Second,
 	}
 }
 

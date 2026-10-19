@@ -16,6 +16,7 @@ type Config struct {
 	LogLevel        slog.Level    // LOG_LEVEL: debug, info, warn or error
 	FetchTimeout    time.Duration // FETCH_TIMEOUT: whole page fetch, including redirects and body
 	LinkTimeout     time.Duration // LINK_TIMEOUT: per checked link
+	LinkBudget      time.Duration // LINK_BUDGET: all link checks of one analysis; links not finished in time are not counted
 	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: how long in-flight requests get to finish on Ctrl+C or SIGTERM
 	LinkWorkers     int           // LINK_WORKERS: concurrent link checks per analysis
 	MaxLinks        int           // MAX_LINKS: unique links checked per analysis
@@ -29,6 +30,7 @@ func Default() Config {
 		LogLevel:        slog.LevelInfo,
 		FetchTimeout:    10 * time.Second,
 		LinkTimeout:     5 * time.Second,
+		LinkBudget:      10 * time.Second,
 		ShutdownTimeout: 15 * time.Second,
 		LinkWorkers:     10,
 		MaxLinks:        100,
@@ -45,6 +47,7 @@ func Load(getenv func(string) string) (Config, error) {
 	l.logLevel("LOG_LEVEL", &cfg.LogLevel)
 	l.positiveDuration("FETCH_TIMEOUT", &cfg.FetchTimeout)
 	l.positiveDuration("LINK_TIMEOUT", &cfg.LinkTimeout)
+	l.positiveDuration("LINK_BUDGET", &cfg.LinkBudget)
 	l.positiveDuration("SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout)
 	l.positiveInt("LINK_WORKERS", &cfg.LinkWorkers)
 	l.positiveInt("MAX_LINKS", &cfg.MaxLinks)
