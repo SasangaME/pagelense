@@ -62,6 +62,14 @@ Endpoints, the response format and every error status are in **[docs/api.md](doc
 
 The per-package results, manual test cases with screenshots and API tests with Bruno are in **[docs/testing.md](docs/testing.md)**.
 
+## Observability
+
+- JSON request logs with a request ID that follows each request from web to api
+- Prometheus metrics for requests, analysis time, link checks and backend errors
+- pprof on each service's admin port
+
+The logs, metrics, Prometheus setup and screenshots are in **[docs/observability.md](docs/observability.md)**.
+
 ## How it works
 
 Type a URL into the form. web sends it to `POST /api/v1/analyze` on api. api fetches the page, parses it, checks the links concurrently and returns JSON, and web renders the result.
