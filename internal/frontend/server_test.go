@@ -1,4 +1,4 @@
-package server
+package frontend
 
 import (
 	"context"
@@ -15,8 +15,6 @@ import (
 	"github.com/SasangaME/pagelense/web"
 )
 
-var _ Analyzer = (*analyzer.Analyzer)(nil)
-
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 	os.Exit(m.Run())
@@ -25,15 +23,17 @@ func TestMain(m *testing.M) {
 type fakeAnalyzer struct {
 	result analyzer.Result
 	err    error
+	gotURL string
 }
 
-func (f fakeAnalyzer) Analyze(context.Context, string) (analyzer.Result, error) {
+func (f *fakeAnalyzer) Analyze(_ context.Context, rawURL string) (analyzer.Result, error) {
+	f.gotURL = rawURL
 	return f.result, f.err
 }
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	h, err := New(fakeAnalyzer{})
+	h, err := New(&fakeAnalyzer{})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestRoutes(t *testing.T) {
 		{http.MethodGet, "/nope", http.StatusNotFound},
 		{http.MethodDelete, "/", http.StatusMethodNotAllowed},
 		{http.MethodGet, "/analyze", http.StatusMethodNotAllowed},
-		{http.MethodGet, "/api/v1/analyze", http.StatusMethodNotAllowed},
+		{http.MethodPost, "/api/v1/analyze", http.StatusNotFound}, // served by the backend
 		{http.MethodPost, "/healthz", http.StatusMethodNotAllowed},
 		{http.MethodGet, "/static/", http.StatusNotFound}, // no directory listing
 	}
@@ -73,7 +73,6 @@ func TestRoutesRegistered(t *testing.T) {
 	for _, route := range []struct{ method, path string }{
 		{http.MethodGet, "/"},
 		{http.MethodPost, "/analyze"},
-		{http.MethodPost, "/api/v1/analyze"},
 		{http.MethodGet, "/healthz"},
 	} {
 		code := serve(h, route.method, route.path).Code

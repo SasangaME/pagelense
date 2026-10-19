@@ -1,5 +1,5 @@
-// Package server provides the HTTP routes, handlers and middleware.
-package server
+// Package frontend serves the web pages and gets each analysis from the backend API.
+package frontend
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/SasangaME/pagelense/web"
 )
 
-// Analyzer analyzes a web page. *analyzer.Analyzer implements it.
+// Analyzer analyzes a web page. The backend API client implements it; tests use a fake.
 type Analyzer interface {
 	Analyze(ctx context.Context, rawURL string) (analyzer.Result, error)
 }
@@ -25,13 +25,18 @@ type Server struct {
 	analyzer Analyzer
 }
 
-// New returns the app's HTTP handler: web pages, JSON API, health check and static files.
+// New returns the frontend's HTTP handler: web pages, health check and static files.
 func New(a Analyzer) (http.Handler, error) {
-	pages, err := parsePages(web.FS)
+	return newHandler(a, web.FS)
+}
+
+// newHandler builds the handler from the templates and static files in fsys, so tests can use their own templates.
+func newHandler(a Analyzer, fsys fs.FS) (http.Handler, error) {
+	pages, err := parsePages(fsys)
 	if err != nil {
 		return nil, err
 	}
-	static, err := fs.Sub(web.FS, "static")
+	static, err := fs.Sub(fsys, "static")
 	if err != nil {
 		return nil, fmt.Errorf("static files: %w", err)
 	}
@@ -47,7 +52,6 @@ func New(a Analyzer) (http.Handler, error) {
 
 	r.GET("/", s.handleIndex)
 	r.POST("/analyze", s.handleAnalyze)
-	r.POST("/api/v1/analyze", s.handleAPIAnalyze)
 	r.GET("/healthz", s.handleHealth)
 	// a single file instead of StaticFS, which would list directories
 	r.StaticFileFS("/static/style.css", "style.css", http.FS(static))
