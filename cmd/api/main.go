@@ -2,11 +2,13 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +20,7 @@ import (
 	"github.com/SasangaME/pagelense/internal/fetcher"
 	"github.com/SasangaME/pagelense/internal/linkcheck"
 	"github.com/SasangaME/pagelense/internal/metrics"
+	"github.com/SasangaME/pagelense/internal/serve"
 )
 
 // Fetch limits that are not worth an env var.
@@ -76,15 +79,16 @@ func run() error {
 	}
 	adminSrv := admin.NewServer(cfg.AdminPort, reg)
 
-	// either server failing stops the service; graceful shutdown comes with the signal handling
-	errc := make(chan error, 2)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	go func() {
-		log.Info("admin listening", "addr", adminSrv.Addr)
-		errc <- fmt.Errorf("admin server: %w", adminSrv.ListenAndServe())
+		// once shutdown starts, a second Ctrl+C gets Go's default handling and exits at once
+		<-ctx.Done()
+		stop()
 	}()
-	go func() {
-		log.Info("api listening", "addr", srv.Addr)
-		errc <- fmt.Errorf("api server: %w", srv.ListenAndServe())
-	}()
-	return <-errc
+
+	return serve.Run(ctx, log, cfg.ShutdownTimeout,
+		serve.Server{Name: "api", Server: srv},
+		serve.Server{Name: "admin", Server: adminSrv},
+	)
 }

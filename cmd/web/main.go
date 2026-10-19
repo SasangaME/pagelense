@@ -2,11 +2,13 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,7 @@ import (
 	"github.com/SasangaME/pagelense/internal/config"
 	"github.com/SasangaME/pagelense/internal/frontend"
 	"github.com/SasangaME/pagelense/internal/metrics"
+	"github.com/SasangaME/pagelense/internal/serve"
 )
 
 func main() {
@@ -56,15 +59,17 @@ func run() error {
 	}
 	adminSrv := admin.NewServer(cfg.AdminPort, reg)
 
-	// either server failing stops the service; graceful shutdown comes with the signal handling
-	errc := make(chan error, 2)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	go func() {
-		log.Info("admin listening", "addr", adminSrv.Addr)
-		errc <- fmt.Errorf("admin server: %w", adminSrv.ListenAndServe())
+		// once shutdown starts, a second Ctrl+C gets Go's default handling and exits at once
+		<-ctx.Done()
+		stop()
 	}()
-	go func() {
-		log.Info("web listening", "addr", srv.Addr, "api_url", cfg.APIURL)
-		errc <- fmt.Errorf("web server: %w", srv.ListenAndServe())
-	}()
-	return <-errc
+
+	log.Info("using backend", "api_url", cfg.APIURL)
+	return serve.Run(ctx, log, cfg.ShutdownTimeout,
+		serve.Server{Name: "web", Server: srv},
+		serve.Server{Name: "admin", Server: adminSrv},
+	)
 }
