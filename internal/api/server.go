@@ -24,7 +24,8 @@ type Server struct {
 }
 
 // New returns the backend's HTTP handler: the analyze endpoint and health check, with request IDs, logging and recovery.
-func New(a Analyzer, log *slog.Logger) (http.Handler, error) {
+// Any extra middleware, such as request metrics, runs first, so it sees every request and the final status.
+func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
 	s := &Server{analyzer: a}
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
@@ -32,6 +33,7 @@ func New(a Analyzer, log *slog.Logger) (http.Handler, error) {
 	if err := r.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
+	r.Use(extra...)
 	r.Use(
 		middleware.RequestID(),
 		middleware.Logger(log),

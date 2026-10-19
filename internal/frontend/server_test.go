@@ -164,3 +164,20 @@ func TestParsePagesErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestExtraMiddlewareSeesFinalStatus(t *testing.T) {
+	var got int
+	record := func(c *gin.Context) {
+		c.Next()
+		got = c.Writer.Status()
+	}
+	h, err := New(&fakeAnalyzer{}, discardLogger, record)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	serve(h, http.MethodGet, "/nope")
+
+	if got != http.StatusNotFound {
+		t.Errorf("middleware saw status %d, want 404", got)
+	}
+}

@@ -43,12 +43,13 @@ func (s *Server) render(c *gin.Context, status int, name string, data pageData) 
 }
 
 // New returns the frontend's HTTP handler: web pages, health check and static files, with request IDs, logging and recovery.
-func New(a Analyzer, log *slog.Logger) (http.Handler, error) {
-	return newHandler(a, web.FS, log)
+// Any extra middleware, such as request metrics, runs first, so it sees every request and the final status.
+func New(a Analyzer, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
+	return newHandler(a, web.FS, log, extra...)
 }
 
 // newHandler builds the handler from the templates and static files in fsys, so tests can use their own templates.
-func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) {
+func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger, extra ...gin.HandlerFunc) (http.Handler, error) {
 	pages, err := parsePages(fsys)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,7 @@ func newHandler(a Analyzer, fsys fs.FS, log *slog.Logger) (http.Handler, error) 
 	if err := r.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
+	r.Use(extra...)
 	r.Use(
 		middleware.RequestID(),
 		middleware.Logger(log),

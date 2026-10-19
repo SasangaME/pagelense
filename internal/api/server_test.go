@@ -103,3 +103,21 @@ func TestPanicReturnsJSONError(t *testing.T) {
 		t.Error("no request ID on the panic response")
 	}
 }
+
+func TestExtraMiddlewareSeesFinalStatus(t *testing.T) {
+	var got int
+	record := func(c *gin.Context) {
+		c.Next()
+		got = c.Writer.Status()
+	}
+	h, err := New(panicAnalyzer{}, discardLogger, record)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	postJSON(h, `{"url": "https://example.com"}`)
+
+	// extra middleware wraps recovery, so a recovered panic is seen as the 500 it was answered with
+	if got != http.StatusInternalServerError {
+		t.Errorf("middleware saw status %d, want 500", got)
+	}
+}
