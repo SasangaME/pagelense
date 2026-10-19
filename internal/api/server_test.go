@@ -23,9 +23,11 @@ type fakeAnalyzer struct {
 	result analyzer.Result
 	err    error
 	gotURL string
+	called bool
 }
 
 func (f *fakeAnalyzer) Analyze(_ context.Context, rawURL string) (analyzer.Result, error) {
+	f.called = true
 	f.gotURL = rawURL
 	return f.result, f.err
 }
