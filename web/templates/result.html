@@ -1,6 +1,9 @@
 {{define "content"}}
+{{template "intro" .}}
+
 {{with .Result}}
-<h1>Analysis</h1>
+<section class="results" aria-labelledby="results-heading">
+<h2 id="results-heading">Analysis</h2>
 <p class="analyzed">Results for <a href="{{.URL}}" rel="nofollow noopener noreferrer">{{.URL}}</a></p>
 
 <table class="summary">
@@ -9,20 +12,18 @@
   <tr><th scope="row">Login form</th><td>{{if .HasLoginForm}}Yes{{else}}No{{end}}</td></tr>
 </table>
 
-<h2>Headings</h2>
+<h3>Headings</h3>
 <table class="counts">
   <thead><tr><th>h1</th><th>h2</th><th>h3</th><th>h4</th><th>h5</th><th>h6</th></tr></thead>
   <tbody><tr><td>{{.Headings.H1}}</td><td>{{.Headings.H2}}</td><td>{{.Headings.H3}}</td><td>{{.Headings.H4}}</td><td>{{.Headings.H5}}</td><td>{{.Headings.H6}}</td></tr></tbody>
 </table>
 
-<h2>Links</h2>
+<h3>Links</h3>
 <table class="summary">
   <tr><th scope="row">Internal</th><td>{{.Links.Internal}}</td></tr>
   <tr><th scope="row">External</th><td>{{.Links.External}}</td></tr>
   <tr><th scope="row">Inaccessible</th><td>{{.Links.Inaccessible}} <span class="muted">of {{.Links.Checked}} checked</span></td></tr>
 </table>
+</section>
 {{end}}
-
-<h2>Analyze another page</h2>
-{{template "form" .}}
 {{end}}

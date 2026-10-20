@@ -69,8 +69,18 @@ h1 {
 }
 
 h2 {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+h3 {
   font-size: 1.125rem;
   margin: 2rem 0 0.5rem;
+}
+
+.results {
+  margin-top: 2rem;
+  scroll-margin-top: 1rem;
 }
 
 a {
@@ -157,7 +167,7 @@ button.loading::before {
   }
 }
 
-h1:focus {
+.results h2:focus {
   outline: none;
 }
 
@@ -206,7 +216,7 @@ td {
   color: var(--error-text);
 }
 
-.error h1 {
+.error h2 {
   font-size: 1.25rem;
 }
 

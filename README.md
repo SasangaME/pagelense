@@ -51,7 +51,7 @@ make lint
 
 ![pagelense architecture](docs/architecture.png)
 
-The services, packages and request flow are in **[docs/architecture.md](docs/architecture.md)**.
+The services, packages and request flow are in **[docs/architecture.md](docs/architecture.md#architecture)**.
 
 ## API
 
@@ -61,7 +61,7 @@ curl -X POST http://localhost:8081/api/v1/analyze \
   -d '{"url": "https://example.com"}'
 ```
 
-Endpoints, the response format and every error status are in **[docs/api.md](docs/api.md)**.
+Endpoints, the response format and every error status are in **[docs/api.md](docs/api.md#api)**.
 
 ## Testing
 
@@ -69,7 +69,7 @@ Endpoints, the response format and every error status are in **[docs/api.md](doc
 - 90.7% coverage (`make cover` fails under 70%)
 - 0 lint issues
 
-The per-package results, manual test cases with screenshots and API tests with Bruno are in **[docs/testing.md](docs/testing.md)**.
+The per-package results, manual test cases with screenshots and API tests with Bruno are in **[docs/testing.md](docs/testing.md#testing)**.
 
 ## Observability
 
@@ -77,7 +77,7 @@ The per-package results, manual test cases with screenshots and API tests with B
 - Prometheus metrics for requests, analysis time, link checks and backend errors
 - pprof on each service's admin port
 
-The logs, metrics, Prometheus setup and screenshots are in **[docs/observability.md](docs/observability.md)**.
+The logs, metrics, Prometheus setup and screenshots are in **[docs/observability.md](docs/observability.md#observability)**.
 
 ## How it works
 

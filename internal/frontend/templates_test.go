@@ -78,6 +78,9 @@ func TestResultPage(t *testing.T) {
 		`<td>2 <span class="muted">of 16 checked</span></td>`,
 		`value="https://example.com"`, // the form is ready for another analysis
 	)
+	if form, results := strings.Index(body, `<form class="analyze"`), strings.Index(body, `<section class="results"`); form > results {
+		t.Error("form should come before the results")
+	}
 	assertOnlyAppScript(t, body)
 }
 
@@ -97,8 +100,8 @@ func TestErrorPage(t *testing.T) {
 	}
 	body := w.Body.String()
 	assertContains(t, body,
-		`<section class="error" role="alert">`,
-		"<h1>Error 404 Not Found</h1>",
+		`<section class="results error" role="alert">`,
+		"<h2>Error 404 Not Found</h2>",
 		"<p>example.com returned 404 Not Found</p>",
 		`value="https://example.com/missing?q=&#34;&gt;&lt;b&gt;"`,
 	)
@@ -112,14 +115,14 @@ func TestErrorPageUnknownStatus(t *testing.T) {
 	fake := &fakeAnalyzer{err: &APIError{Status: 599, Message: "odd upstream"}}
 	body := postForm(newRealHandler(t, fake), url.Values{"url": {"https://example.com"}}).Body.String()
 
-	assertContains(t, body, "<h1>Error 599</h1>")
+	assertContains(t, body, "<h2>Error 599</h2>")
 }
 
 func TestResultPagePartial(t *testing.T) {
 	fake := &fakeAnalyzer{result: analyzer.Result{URL: "https://example.com", HTMLVersion: "HTML5"}}
 	body := postPartial(newRealHandler(t, fake), url.Values{"url": {"https://example.com"}}).Body.String()
 
-	assertContains(t, body, "<h1>Analysis</h1>", `<form class="analyze" method="post" action="/analyze">`)
+	assertContains(t, body, `<h2 id="results-heading">Analysis</h2>`, `<form class="analyze" method="post" action="/analyze">`)
 	for _, layout := range []string{"<!DOCTYPE", "<header>", "<main>", "<script"} {
 		if strings.Contains(body, layout) {
 			t.Errorf("partial page contains layout markup %q", layout)

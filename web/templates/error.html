@@ -1,7 +1,8 @@
 {{define "content"}}
-<section class="error" role="alert">
-  <h1>Error {{.Status}}{{with statusText .Status}} {{.}}{{end}}</h1>
+{{template "intro" .}}
+
+<section class="results error" role="alert">
+  <h2>Error {{.Status}}{{with statusText .Status}} {{.}}{{end}}</h2>
   <p>{{.Error}}</p>
 </section>
-{{template "form" .}}
 {{end}}
