@@ -1,11 +1,20 @@
 # pagelense
 
-Give it a URL and it tells you what's on the page: HTML version, title, heading counts, internal and external links (and how many are broken), and whether there's a login form.
+pagelense is a web app that analyzes a web page from its URL. For each page it shows:
+
+- HTML version
+- Page title
+- Number of headings by level (h1–h6)
+- Number of internal and external links
+- Number of inaccessible links
+- Whether the page has a login form
 
 It's two small Go services:
 
 - **web** on http://localhost:8080 – the HTML pages
 - **api** on http://localhost:8081 – the JSON API that does the work
+
+Each service also has an admin port with `/metrics` and `/debug/pprof`: 9090 for web and 9091 for api. With `make run-web` and `make run-api` they're on localhost. With compose they stay inside the compose network, where Prometheus scrapes them, and http://localhost:9090 is the Prometheus UI.
 
 ## Tech stack
 
